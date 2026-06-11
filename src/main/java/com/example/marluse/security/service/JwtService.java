@@ -1,4 +1,4 @@
-package com.example.marluse.security;
+package com.example.marluse.security.service;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

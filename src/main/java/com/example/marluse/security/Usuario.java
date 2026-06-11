@@ -4,10 +4,7 @@ import com.example.marluse.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,6 +18,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Usuario extends BaseEntity implements UserDetails {
 
 
@@ -33,6 +31,9 @@ public class Usuario extends BaseEntity implements UserDetails {
     @Column(nullable = false)
     private boolean ativo = true;
 
+    @Column(nullable = false)
+    private String senha;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of();
@@ -40,12 +41,12 @@ public class Usuario extends BaseEntity implements UserDetails {
 
     @Override
     public @Nullable String getPassword() {
-        return "";
+        return senha;
     }
 
     @Override
     public String getUsername() {
-        return "";
+        return email;
     }
 
     @Override
