@@ -1,4 +1,4 @@
-package com.example.marluse.security;
+package com.example.marluse.security.model;
 
 import com.example.marluse.shared.BaseEntity;
 import jakarta.persistence.Column;

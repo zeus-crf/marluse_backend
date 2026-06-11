@@ -1,7 +1,7 @@
 package com.example.marluse.security.service;
 
-import com.example.marluse.security.Usuario;
-import com.example.marluse.security.UsuarioRepository;
+import com.example.marluse.security.model.Usuario;
+import com.example.marluse.security.repository.UsuarioRepository;
 import com.example.marluse.security.dto.AuthRequest;
 import com.example.marluse.security.dto.AuthResponse;
 import com.example.marluse.security.dto.RegisterRequest;
@@ -9,7 +9,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
