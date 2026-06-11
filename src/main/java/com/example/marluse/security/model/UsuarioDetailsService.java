@@ -1,6 +1,6 @@
-package com.example.marluse.security;
+package com.example.marluse.security.model;
 
-import jakarta.persistence.EntityNotFoundException;
+import com.example.marluse.security.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
