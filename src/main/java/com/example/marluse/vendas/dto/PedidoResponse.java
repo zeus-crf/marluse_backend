@@ -1,4 +1,34 @@
 package com.example.marluse.vendas.dto;
 
-public class PedidoResponse {
+import com.example.marluse.vendas.model.Pedido;
+import com.example.marluse.vendas.enums.FormaPagamento;
+import com.example.marluse.vendas.enums.StatusPedido;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+public record PedidoResponse(
+        String id,
+        String clienteId,
+        String clienteNome,
+        StatusPedido status,
+        FormaPagamento formaPagamento,
+        BigDecimal valorTotal,
+        String observacao,
+        List<ItemPedidoResponse> itens,
+        LocalDateTime createdAt
+) {
+    public static PedidoResponse from(Pedido pedido) {
+        return new PedidoResponse(
+                pedido.getId(),
+                pedido.getCliente() != null ? pedido.getCliente().getId() : null,
+                pedido.getCliente() != null ? pedido.getCliente().getNome() : "Consumidor Final",
+                pedido.getStatus(),
+                pedido.getFormaPagamento(),
+                pedido.getValorTotal(),
+                pedido.getObservacao(),
+                pedido.getItens().stream().map(ItemPedidoResponse::from).toList(),
+                pedido.getCreatedAt()
+        );
+    }
 }
