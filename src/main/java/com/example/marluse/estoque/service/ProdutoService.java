@@ -28,6 +28,7 @@ public class ProdutoService {
                 .descricao(request.descricao())
                 .preco(request.preco())
                 .quantidadeEstoque(request.quantidadeEstoque() != null ? request.quantidadeEstoque() : 0)
+                .estoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0)
                 .ativo(true)
                 .medida(request.medida())
                 .build();
@@ -62,8 +63,8 @@ public class ProdutoService {
         return ProdutoResponse.from(produtoRepository.save(produto));
     }
 
-    public List<ProdutoResponse> listarEstoqueBaixo(){
-        return produtoRepository.findByQuantidadeEstoqueLessThanEqualAndAtivoTrue(0)
+    public List<ProdutoResponse> listarEstoqueBaixo() {
+        return produtoRepository.findEstoqueBaixo()
                 .stream()
                 .map(ProdutoResponse::from)
                 .toList();
