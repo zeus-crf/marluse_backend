@@ -1,4 +1,4 @@
 package com.example.marluse.financeiro.service;
 
-public class FinanceiroService {
+public class LancamentoFinanceiroService {
 }
