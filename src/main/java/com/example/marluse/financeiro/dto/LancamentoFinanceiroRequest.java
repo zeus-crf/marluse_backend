@@ -1,5 +1,6 @@
 package com.example.marluse.financeiro.dto;
 
+import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.enums.TipoLancamento;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
@@ -21,6 +22,11 @@ public record LancamentoFinanceiroRequest(
         @DecimalMin(value = "0.01", message = "O valor deve ser maior que zero")
         BigDecimal valor,
 
-        LocalDate dataVencimento
+        @NotNull(message = "O status não pode ser nulo")
+        StatusLancamento status,
+
+        LocalDate dataVencimento,
+
+        LocalDate dataPagamento
 ) {
 }
