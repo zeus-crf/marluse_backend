@@ -5,6 +5,10 @@ import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.estoque.enums.UnidadeMedida;
+import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.enums.TipoLancamento;
+import com.example.marluse.financeiro.model.LancamentoFinanceiro;
+import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.vendas.dto.ItemPedidoRequest;
 import com.example.marluse.vendas.dto.PedidoRequest;
 import com.example.marluse.vendas.dto.PedidoResponse;
@@ -12,14 +16,15 @@ import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
 import com.example.marluse.vendas.repository.PedidoRepository;
 import com.example.marluse.vendas.service.PedidoService;
+import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,13 +46,17 @@ class PedidoServiceTest {
     @Autowired
     private ClienteRepository clienteRepository;
 
+    @Autowired
+    private LancamentoFinanceiroRepository lancamentoRepository;
+
     private Produto produto;
     private Cliente cliente;
 
     @BeforeEach
     void setUp() {
-        pedidoRepository.deleteAll();
-        produtoRepository.deleteAll();
+        lancamentoRepository.deleteAll();  // 1º — depende de pedido
+        pedidoRepository.deleteAll();      // 2º — depende de cliente e produto
+        produtoRepository.deleteAll();     // 3º
         clienteRepository.deleteAll();
 
         produto = produtoRepository.save(Produto.builder()
@@ -61,12 +70,53 @@ class PedidoServiceTest {
 
         cliente = clienteRepository.save(Cliente.builder()
                 .nome("João Silva")
-                .cpfCnpj("123.456.789-00")
+                .cpfCnpj("724.456.769-00")
                 .ativo(true)
                 .consumidorFinal(false)
                 .build());
     }
 
+    @Test
+    void deveCriarLancamentoPagoAoCriarPedidoComPagamentoImediato() {
+        PedidoRequest request = new PedidoRequest(
+                cliente.getId(),
+                FormaPagamento.PIX,
+                List.of(new ItemPedidoRequest(produto.getId(), 2)),
+                null
+        );
+
+        PedidoResponse pedido = pedidoService.criar(request);
+
+        List<LancamentoFinanceiro> lancamentos = lancamentoRepository.findAll();
+        assertEquals(1, lancamentos.size());
+
+        LancamentoFinanceiro lancamento = lancamentos.get(0);
+        assertEquals(TipoLancamento.RECEITA, lancamento.getTipo());
+        assertEquals(StatusLancamento.PAGO, lancamento.getStatus());
+        assertEquals(pedido.valorTotal(), lancamento.getValor());
+        assertEquals(pedido.id(), lancamento.getPedido().getId());
+        assertEquals(LocalDate.now(), lancamento.getDataPagamento());
+    }
+
+    @Test
+    void deveCriarLancamentoPendenteAoCriarPedidoFiado() {
+        PedidoRequest request = new PedidoRequest(
+                cliente.getId(),
+                FormaPagamento.FIADO,
+                List.of(new ItemPedidoRequest(produto.getId(), 2)),
+                null  // observacao
+        );
+
+        PedidoResponse pedido = pedidoService.criar(request);
+
+        List<LancamentoFinanceiro> lancamentos = lancamentoRepository.findAll();
+        assertEquals(1, lancamentos.size());
+
+        LancamentoFinanceiro lancamento = lancamentos.get(0);
+        assertEquals(StatusLancamento.PENDENTE, lancamento.getStatus());
+        assertEquals(LocalDate.now().plusDays(30), lancamento.getDataVencimento());
+        assertNull(lancamento.getDataPagamento());
+    }
     @Test
     void deveCriarPedidoComSucesso() {
         PedidoRequest request = new PedidoRequest(
@@ -79,7 +129,7 @@ class PedidoServiceTest {
         PedidoResponse response = pedidoService.criar(request);
 
         assertNotNull(response.id());
-        assertEquals(StatusPedido.PENDENTE, response.status());
+        assertEquals(StatusPedido.CONFIRMADO, response.status());
         assertEquals(new BigDecimal("107.70"), response.valorTotal());
         assertEquals(1, response.itens().size());
     }
@@ -87,7 +137,7 @@ class PedidoServiceTest {
     @Test
     void deveDiminuirEstoqueAoCriarPedido() {
         PedidoRequest request = new PedidoRequest(
-                null,
+                cliente.getId(),
                 FormaPagamento.DINHEIRO,
                 List.of(new ItemPedidoRequest(produto.getId(), 10)),
                 null
@@ -102,7 +152,7 @@ class PedidoServiceTest {
     @Test
     void deveLancarExcecaoQuandoEstoqueInsuficiente() {
         PedidoRequest request = new PedidoRequest(
-                null,
+                cliente.getId(),
                 FormaPagamento.PIX,
                 List.of(new ItemPedidoRequest(produto.getId(), 100)),
                 null
@@ -114,7 +164,7 @@ class PedidoServiceTest {
     @Test
     void deveCancelarPedidoERestaurarEstoque() {
         PedidoRequest request = new PedidoRequest(
-                null,
+                cliente.getId(),
                 FormaPagamento.PIX,
                 List.of(new ItemPedidoRequest(produto.getId(), 5)),
                 null
@@ -130,7 +180,7 @@ class PedidoServiceTest {
     @Test
     void deveCriarPedidoSemCliente() {
         PedidoRequest request = new PedidoRequest(
-                null,
+                null,  // ← clienteId deve ser null
                 FormaPagamento.DINHEIRO,
                 List.of(new ItemPedidoRequest(produto.getId(), 1)),
                 "Venda balcão"

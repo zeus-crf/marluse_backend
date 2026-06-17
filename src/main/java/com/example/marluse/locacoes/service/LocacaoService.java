@@ -1,16 +1,24 @@
 package com.example.marluse.locacoes.service;
 
+import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
+import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
 import com.example.marluse.locacoes.dto.ItemLocacaoRequest;
+import com.example.marluse.locacoes.dto.ItemLocacaoResponse;
 import com.example.marluse.locacoes.dto.LocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoResponse;
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.locacoes.model.ItemLocacao;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
+import com.example.marluse.vendas.dto.ItemPedidoResponse;
+import com.example.marluse.vendas.dto.PedidoResponse;
+import com.example.marluse.vendas.enums.FormaPagamento;
+import com.example.marluse.vendas.model.Pedido;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Status;
 import jakarta.transaction.Transactional;
@@ -31,14 +39,21 @@ public class LocacaoService {
     private final LocacaoRepository locacaoRepository;
     private final ProdutoRepository produtoRepository;
     private final ClienteRepository clienteRepository;
+    private final LancamentoFinanceiroService lancamentoService;
 
     @Transactional
     public LocacaoResponse criar(LocacaoRequest request){
+        Cliente cliente = null;
+        if (request.clienteId() != null) {
+            cliente = clienteRepository.findById(request.clienteId())
+                    .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
+        }
+
         if (!request.dataDevolucaoPrevista().isAfter(request.dataRetirada())){
             throw new IllegalArgumentException("A data de devolução deve ser posterior à data de retirada");
         }
 
-        // Calcula os dias entre dara de retirada e data de devolução prevista
+        // Calcula os dias entre data de retirada e data de devolução prevista
         long dias = ChronoUnit.DAYS.between(request.dataRetirada(), request.dataDevolucaoPrevista());
 
         Locacao locacao = Locacao.builder()
@@ -50,10 +65,7 @@ public class LocacaoService {
                 .valorTotal(BigDecimal.ZERO)
                 .build();
 
-        if (request.clienteId() != null){
-            locacao.setCliente(clienteRepository.findById(request.clienteId())
-                    .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado")));
-        }
+        locacao.setCliente(cliente);
 
         BigDecimal total = BigDecimal.ZERO;
 
@@ -84,8 +96,31 @@ public class LocacaoService {
             produtoRepository.save(produto);
         }
 
+
         locacao.setValorTotal(total);
-        return LocacaoResponse.from(locacaoRepository.save(locacao));
+        Locacao locacaoSalva = locacaoRepository.save(locacao);
+
+        // Integração financeira
+        String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+        if (request.formaPagamento() == FormaPagamento.FIADO) {
+            lancamentoService.registarLocacaoReceita(
+                    locacaoSalva,
+                    "Locação fiado - " + nomeCliente,
+                    total,
+                    StatusLancamento.PENDENTE,
+                    locacaoSalva.getDataDevolucaoPrevista().plusDays(1)
+            );
+        } else {
+            lancamentoService.registarLocacaoReceita(
+                    locacaoSalva,
+                    "Locação - " + nomeCliente,
+                    total,
+                    StatusLancamento.PAGO,
+                    LocalDate.now()
+            );
+        }
+
+        return toResponse(locacaoSalva);
     }
 
     public List<LocacaoResponse> listarTodas(){
@@ -155,5 +190,34 @@ public class LocacaoService {
 
         locacao.setStatus(StatusLocacao.CANCELADA);
         return LocacaoResponse.from(locacaoRepository.save(locacao));
+    }
+
+    private LocacaoResponse toResponse (Locacao locacao){
+
+        List<ItemLocacaoResponse> itens = locacao.getItens().stream()
+                .map(item -> new ItemLocacaoResponse(
+                        item.getId(),
+                        item.getProduto().getId(),
+                        item.getProduto().getNome(),
+                        item.getQuantidade(),
+                        item.getPrecoDiaria(),
+                        item.getSubtotal()
+                ))
+                .toList();
+        return new LocacaoResponse(
+                locacao.getId(),
+                locacao.getCliente() != null ? locacao.getCliente().getId() : null,
+                locacao.getCliente() != null ? locacao.getCliente().getNome() : "Consumidor Final",
+                locacao.getStatus(),
+                locacao.getFormaPagamento(),
+                locacao.getDataRetirada(),
+                locacao.getDataDevolucaoPrevista(),
+                locacao.getDataDevolucaoReal(),
+                locacao.getValorTotal(),
+                locacao.getObservacao(),
+                itens,
+                locacao.getCreatedAt()
+
+        );
     }
 }

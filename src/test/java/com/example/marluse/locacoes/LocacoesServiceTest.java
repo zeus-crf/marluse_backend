@@ -5,6 +5,10 @@ import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
+import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.enums.TipoLancamento;
+import com.example.marluse.financeiro.model.LancamentoFinanceiro;
+import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.locacoes.dto.ItemLocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoResponse;
@@ -45,26 +49,30 @@ public class LocacoesServiceTest {
     @Autowired
     private ClienteRepository clienteRepository;
 
+    @Autowired
+    private LancamentoFinanceiroRepository lancamentoRepository;
+
     private Produto produto;
     private Cliente cliente;
 
     @BeforeEach
     void setUp() {
-        clienteRepository.deleteAll();
-        produtoRepository.deleteAll();
+        lancamentoRepository.deleteAll();
         locacaoRepository.deleteAll();
+        produtoRepository.deleteAll();
+        clienteRepository.deleteAll();
 
         produto = produtoRepository.save(Produto.builder()
-                .nome("Betoneira")
+                .nome("Andaime")
                 .preco(new BigDecimal("50.00"))
                 .quantidadeEstoque(5)
-                .estoqueMinimo(1)
+                .estoqueMinimo(2)
                 .medida(UnidadeMedida.PECA)
                 .ativo(true)
                 .build());
 
         cliente = clienteRepository.save(Cliente.builder()
-                .nome("Maria Santos")
+                .nome("Maria Costa")
                 .cpfCnpj("987.654.321-00")
                 .ativo(true)
                 .consumidorFinal(false)
@@ -82,6 +90,53 @@ public class LocacoesServiceTest {
                     List.of(new ItemLocacaoRequest(produto.getId(), quantidade)),
                     null
             );
+    }
+
+    @Test
+    void deveCriarLancamentoPagoAoCriarLocacaoComPagamentoImediato() {
+        LocacaoRequest request = new LocacaoRequest(
+                cliente.getId(),
+                FormaPagamento.PIX,
+                LocalDate.now(),
+                LocalDate.now().plusDays(3),
+                List.of(new ItemLocacaoRequest(produto.getId(), 1)),
+                null
+        );
+
+        LocacaoResponse locacao = locacaoService.criar(request);
+
+        List<LancamentoFinanceiro> lancamentos = lancamentoRepository.findAll();
+        assertEquals(1, lancamentos.size());
+
+        LancamentoFinanceiro lancamento = lancamentos.get(0);
+        assertEquals(TipoLancamento.RECEITA, lancamento.getTipo());
+        assertEquals(StatusLancamento.PAGO, lancamento.getStatus());
+        assertEquals("Locação", lancamento.getCategoria());
+        assertEquals(locacao.id(), lancamento.getLocacao().getId());
+        assertNotNull(lancamento.getDataPagamento());
+    }
+
+    @Test
+    void deveCriarLancamentoPendenteAoCriarLocacaoFiado() {
+        LocalDate dataFim = LocalDate.now().plusDays(5);
+
+        LocacaoRequest request = new LocacaoRequest(
+                cliente.getId(),
+                FormaPagamento.FIADO,
+                LocalDate.now(),
+                dataFim,
+                List.of(new ItemLocacaoRequest(produto.getId(), 1)),
+                null
+        );
+        locacaoService.criar(request);
+
+        List<LancamentoFinanceiro> lancamentos = lancamentoRepository.findAll();
+        assertEquals(1, lancamentos.size());
+
+        LancamentoFinanceiro lancamento = lancamentos.get(0);
+        assertEquals(StatusLancamento.PENDENTE, lancamento.getStatus());
+        assertEquals(dataFim.plusDays(1), lancamento.getDataVencimento());
+        assertNull(lancamento.getDataPagamento());
     }
 
     @Test

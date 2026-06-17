@@ -32,6 +32,8 @@ public class LancamentoServiceTest {
     @Autowired
     private LancamentoFinanceiroRepository lancamentoRepository;
 
+
+
     @BeforeEach
     void setUp(){
         lancamentoRepository.deleteAll();
