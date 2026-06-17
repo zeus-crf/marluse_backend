@@ -38,7 +38,7 @@ public class ProdutoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ProdutoResponse>> atualizar(@PathVariable String id, @Valid @RequestBody ProdutoAtualizarRequest request){
-        return ResponseEntity.ok(ApiResponse.ok("Produto atualizadp com sucesso !", produtoService.atualizar(id, request)));
+        return ResponseEntity.ok(ApiResponse.ok("Produto atualizado com sucesso !", produtoService.atualizar(id, request)));
     }
 
     @GetMapping("/estoque-baixo")

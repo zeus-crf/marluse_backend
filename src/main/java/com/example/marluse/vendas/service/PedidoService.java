@@ -1,11 +1,17 @@
 package com.example.marluse.vendas.service;
 
+import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
+import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
+import com.example.marluse.locacoes.service.LocacaoService;
 import com.example.marluse.vendas.dto.ItemPedidoRequest;
+import com.example.marluse.vendas.dto.ItemPedidoResponse;
 import com.example.marluse.vendas.dto.PedidoRequest;
 import com.example.marluse.vendas.dto.PedidoResponse;
+import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
 import com.example.marluse.vendas.model.ItemPedido;
 import com.example.marluse.vendas.model.Pedido;
@@ -16,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -26,28 +33,36 @@ public class PedidoService {
     private final ProdutoRepository produtoRepository;
     private final ClienteRepository clienteRepository;
 
+    private final LancamentoFinanceiroService lancamentoService;
     @Transactional
     public PedidoResponse criar (PedidoRequest request) {
 
+        Cliente cliente = null;
+        if (request.clienteId() != null) {
+            cliente = clienteRepository.findById(request.clienteId())
+                    .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
+        }
+
+
         Pedido pedido = Pedido.builder()
-                .status(StatusPedido.PENDENTE)
+                .status(StatusPedido.CONFIRMADO)
                 .formaPagamento(request.formaPagamento())
                 .observacao(request.observacao())
                 .valorTotal(BigDecimal.ZERO)
                 .build();
 
-        if (request.clienteId() != null){
+        if (request.clienteId() != null) {
             pedido.setCliente(clienteRepository.findById(request.clienteId())
                     .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado")));
         }
 
         BigDecimal total = BigDecimal.ZERO;
 
-        for (ItemPedidoRequest itemRequest : request.itens()){
+        for (ItemPedidoRequest itemRequest : request.itens()) {
             Produto produto = produtoRepository.findById(itemRequest.productId())
                     .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
 
-            if (produto.getQuantidadeEstoque() < itemRequest.quantidade()){
+            if (produto.getQuantidadeEstoque() < itemRequest.quantidade()) {
                 throw new IllegalArgumentException("Estoque insuficiente: " + produto.getNome());
             }
 
@@ -64,12 +79,34 @@ public class PedidoService {
             pedido.getItens().add(item);
             total = total.add(subTotal);
 
+
             produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
             produtoRepository.save(produto);
         }
 
         pedido.setValorTotal(total);
-        return PedidoResponse.from(pedidoRepository.save(pedido));
+        Pedido pedidoSalvo = pedidoRepository.save(pedido);
+
+        String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+
+        if (request.formaPagamento() == FormaPagamento.FIADO) {
+            lancamentoService.registrarVendaReceita(
+                    pedidoSalvo,
+                    "Venda fiado - " + nomeCliente,
+                    total,
+                    StatusLancamento.PENDENTE,
+                    LocalDate.now().plusDays(30)
+            );
+        } else {
+            lancamentoService.registrarVendaReceita(
+                    pedidoSalvo,
+                    "Venda - " + nomeCliente,
+                    total,
+                    StatusLancamento.PAGO,
+                    LocalDate.now()
+            );
+        }
+        return toResponse(pedidoSalvo);
     }
 
     public List<PedidoResponse> listar(){
@@ -93,21 +130,49 @@ public class PedidoService {
     }
 
     @Transactional
-    public PedidoResponse cancelar(String id){
-        Pedido pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Pedido não encontrado"));
+    public PedidoResponse cancelar(String id) {
+        Pedido pedido = buscarEntidade(id);
 
-        if (pedido.getStatus() == StatusPedido.CANCELADO){
-            throw new IllegalArgumentException("O pedido já está cancelado");
+        if (pedido.getStatus() == StatusPedido.CANCELADO) {
+            throw new IllegalArgumentException("Pedido já está cancelado");
         }
 
-        for (ItemPedido item : pedido.getItens()){
+        for (ItemPedido item : pedido.getItens()) {
             Produto produto = item.getProduto();
             produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
             produtoRepository.save(produto);
         }
 
         pedido.setStatus(StatusPedido.CANCELADO);
-        return PedidoResponse.from(pedidoRepository.save(pedido));
+        return toResponse(pedidoRepository.save(pedido));
+    }
+
+    private PedidoResponse toResponse (Pedido pedido){
+
+        List<ItemPedidoResponse> itens = pedido.getItens().stream()
+                .map(item -> new ItemPedidoResponse(
+                        item.getId(),
+                        item.getProduto().getId(),
+                        item.getProduto().getNome(),
+                        item.getQuantidade(),
+                        item.getPrecoUnitario(),
+                        item.getSubTotal()
+                ))
+                .toList();
+        return new PedidoResponse(
+                pedido.getId(),
+                pedido.getCliente() != null ? pedido.getCliente().getId() : null,
+                pedido.getCliente() != null ? pedido.getCliente().getNome() : "Consumidor Final",
+                pedido.getStatus(),
+                pedido.getFormaPagamento(),
+                pedido.getValorTotal(),
+                pedido.getObservacao(),
+                itens,
+                pedido.getCreatedAt()
+        );
+    }
+    private Pedido buscarEntidade(String id) {
+        return pedidoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Pedido não encontrado: " + id));
     }
 }
