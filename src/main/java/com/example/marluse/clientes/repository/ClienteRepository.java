@@ -13,4 +13,6 @@ public interface ClienteRepository extends JpaRepository<Cliente, String> {
 
     boolean existsByCpfCnpj(String cpfCnpj);
 
+    long countByAtivoTrue();
+
 }
