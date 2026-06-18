@@ -1,4 +1,12 @@
 package com.example.marluse.dashboard.dto;
 
-public class EstoqueCriticoResponse {
+import java.math.BigDecimal;
+
+public record EstoqueCriticoResponse(
+        String id,
+        String nome,
+        int quantidadeAtual,
+        int estoqueMinimo,
+        BigDecimal preco
+){
 }

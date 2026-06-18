@@ -1,4 +1,13 @@
 package com.example.marluse.dashboard.dto;
 
-public record DashboardKpisResponse() {
+import java.math.BigDecimal;
+
+public record DashboardKpisResponse(
+        BigDecimal receitaPeriodo,
+        BigDecimal vendasValor,
+        long vendasQuantidade,
+        long locacoesAtivas,
+        BigDecimal locacoesAtivasValor,
+        long clientesAtivos
+) {
 }
