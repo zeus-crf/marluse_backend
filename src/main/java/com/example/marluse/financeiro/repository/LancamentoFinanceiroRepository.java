@@ -5,6 +5,7 @@ import com.example.marluse.financeiro.enums.TipoLancamento;
 import com.example.marluse.financeiro.model.LancamentoFinanceiro;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,4 +25,7 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
     @Query("SELECT l FROM LancamentoFinanceiro l WHERE l.status = 'PENDENTE' AND l.dataVencimento < :hoje")
     List<LancamentoFinanceiro> findVencidos(LocalDate hoje);
+
+    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.dataPagamento BETWEEN :inicio AND :fim")
+    BigDecimal somarReceitaPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 }
