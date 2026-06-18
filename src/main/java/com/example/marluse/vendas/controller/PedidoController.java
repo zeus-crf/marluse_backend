@@ -45,6 +45,11 @@ public class PedidoController {
         return ResponseEntity.ok(ApiResponse.ok(pedidoService.listarPorStatus(status)));
     }
 
+    @PatchMapping("/{id}/pagar")
+    public ResponseEntity<ApiResponse<PedidoResponse>> pagar(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok("Pagamento registrado com sucesso", pedidoService.pagar(id)));
+    }
+
     @PatchMapping("/{id}/cancelar")
     public ResponseEntity<ApiResponse<PedidoResponse>> cancelar(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.ok("Pedido cancelado", pedidoService.cancelar(id)));

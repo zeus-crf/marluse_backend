@@ -5,6 +5,7 @@ import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
 import com.example.marluse.locacoes.service.LocacaoService;
 import com.example.marluse.vendas.dto.ItemPedidoRequest;
@@ -34,6 +35,7 @@ public class PedidoService {
     private final ClienteRepository clienteRepository;
 
     private final LancamentoFinanceiroService lancamentoService;
+    private final LancamentoFinanceiroRepository lancamentoRepository;
     @Transactional
     public PedidoResponse criar (PedidoRequest request) {
 
@@ -127,6 +129,20 @@ public class PedidoService {
                 .stream()
                 .map(PedidoResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public PedidoResponse pagar(String id) {
+        Pedido pedido = buscarEntidade(id);
+
+        if (pedido.getFormaPagamento() != FormaPagamento.FIADO) {
+            throw new IllegalArgumentException("Pedido não é FIADO, não requer pagamento posterior");
+        }
+
+        lancamentoRepository.findByPedidoId(id)
+                .ifPresent(l -> lancamentoService.pagar(l.getId()));
+
+        return toResponse(pedido);
     }
 
     @Transactional
