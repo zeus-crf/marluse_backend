@@ -23,7 +23,7 @@ public class AuthContoller {
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody AuthRequest request){
-        return ResponseEntity.ok(ApiResponse.ok(authService.login(request)));
+        return ResponseEntity.ok(ApiResponse.ok("Login realizado com sucesso", authService.login(request)));
     }
 
     @PostMapping("/register")
