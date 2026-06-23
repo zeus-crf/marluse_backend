@@ -146,13 +146,19 @@ public class PedidoService {
     public PedidoResponse pagar(String id) {
         Pedido pedido = buscarEntidade(id);
 
-        if (pedido.getFormaPagamento() != FormaPagamento.FIADO) {
-            throw new IllegalArgumentException("Pedido não é FIADO, não requer pagamento posterior");
+        if (pedido.getStatus() == StatusPedido.PAGO) {
+            throw new IllegalArgumentException("Pedido já está pago");
         }
 
-        lancamentoRepository.findByPedidoId(id)
-                .ifPresent(l -> lancamentoService.pagar(l.getId()));
+        if (pedido.getStatus() == StatusPedido.CANCELADO) {
+            throw new IllegalArgumentException("Pedido cancelado não pode ser pago");
+        }
 
+        // Só atualiza o lançamento para FIADO (que foi criado como PENDENTE)
+        if (pedido.getFormaPagamento() == FormaPagamento.FIADO) {
+            lancamentoRepository.findByPedidoId(id)
+                    .ifPresent(l -> lancamentoService.pagar(l.getId()));
+        }
 
         pedido.setStatus(StatusPedido.PAGO);
         pedidoRepository.save(pedido);
