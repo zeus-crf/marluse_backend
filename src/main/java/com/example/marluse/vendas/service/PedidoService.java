@@ -7,7 +7,6 @@ import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
-import com.example.marluse.locacoes.service.LocacaoService;
 import com.example.marluse.vendas.dto.ItemPedidoRequest;
 import com.example.marluse.vendas.dto.ItemPedidoResponse;
 import com.example.marluse.vendas.dto.PedidoRequest;
@@ -46,16 +45,18 @@ public class PedidoService {
         }
 
 
+        StatusPedido statusInicial = (request.status() != null) ? request.status() : StatusPedido.CONFIRMADO;
+
         Pedido pedido = Pedido.builder()
-                .status(StatusPedido.CONFIRMADO)
+                .status(statusInicial)
                 .formaPagamento(request.formaPagamento())
                 .observacao(request.observacao())
+                .dataVencimento(request.dataVencimento())
                 .valorTotal(BigDecimal.ZERO)
                 .build();
 
-        if (request.clienteId() != null) {
-            pedido.setCliente(clienteRepository.findById(request.clienteId())
-                    .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado")));
+        if (cliente != null) {
+            pedido.setCliente(cliente);
         }
 
         BigDecimal total = BigDecimal.ZERO;
@@ -64,8 +65,13 @@ public class PedidoService {
             Produto produto = produtoRepository.findById(itemRequest.productId())
                     .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
 
-            if (produto.getQuantidadeEstoque() < itemRequest.quantidade()) {
-                throw new IllegalArgumentException("Estoque insuficiente: " + produto.getNome());
+            // Orçamento não baixa estoque
+            if (statusInicial != StatusPedido.ORCAMENTO) {
+                if (produto.getQuantidadeEstoque() < itemRequest.quantidade()) {
+                    throw new IllegalArgumentException("Estoque insuficiente: " + produto.getNome());
+                }
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
+                produtoRepository.save(produto);
             }
 
             BigDecimal subTotal = produto.getPreco().multiply(BigDecimal.valueOf(itemRequest.quantidade()));
@@ -80,34 +86,37 @@ public class PedidoService {
 
             pedido.getItens().add(item);
             total = total.add(subTotal);
-
-
-            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
-            produtoRepository.save(produto);
         }
 
         pedido.setValorTotal(total);
         Pedido pedidoSalvo = pedidoRepository.save(pedido);
 
-        String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+        // Orçamento não gera lançamento financeiro
+        if (statusInicial != StatusPedido.ORCAMENTO) {
+            String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
 
-        if (request.formaPagamento() == FormaPagamento.FIADO) {
-            lancamentoService.registrarVendaReceita(
-                    pedidoSalvo,
-                    "Venda fiado - " + nomeCliente,
-                    total,
-                    StatusLancamento.PENDENTE,
-                    LocalDate.now().plusDays(30)
-            );
-        } else {
-            lancamentoService.registrarVendaReceita(
-                    pedidoSalvo,
-                    "Venda - " + nomeCliente,
-                    total,
-                    StatusLancamento.PAGO,
-                    LocalDate.now()
-            );
+            if (request.formaPagamento() == FormaPagamento.FIADO) {
+                LocalDate vencimento = request.dataVencimento() != null
+                        ? request.dataVencimento()
+                        : LocalDate.now().plusDays(30);
+                lancamentoService.registrarVendaReceita(
+                        pedidoSalvo,
+                        "Venda fiado - " + nomeCliente,
+                        total,
+                        StatusLancamento.PENDENTE,
+                        vencimento
+                );
+            } else {
+                lancamentoService.registrarVendaReceita(
+                        pedidoSalvo,
+                        "Venda - " + nomeCliente,
+                        total,
+                        StatusLancamento.PAGO,
+                        LocalDate.now()
+                );
+            }
         }
+
         return toResponse(pedidoSalvo);
     }
 
@@ -123,6 +132,8 @@ public class PedidoService {
                 .map(PedidoResponse::from)
                 .orElseThrow(() -> new EntityNotFoundException("Pedido não encontrado"));
     }
+
+
 
     public List<PedidoResponse> listarPorStatus(StatusPedido status) {
         return pedidoRepository.findByStatus(status)
@@ -142,6 +153,9 @@ public class PedidoService {
         lancamentoRepository.findByPedidoId(id)
                 .ifPresent(l -> lancamentoService.pagar(l.getId()));
 
+
+        pedido.setStatus(StatusPedido.PAGO);
+        pedidoRepository.save(pedido);
         return toResponse(pedido);
     }
 
@@ -184,9 +198,17 @@ public class PedidoService {
                 pedido.getValorTotal(),
                 pedido.getObservacao(),
                 itens,
-                pedido.getCreatedAt()
+                pedido.getCreatedAt(),
+                pedido.getDataVencimento()
         );
     }
+
+    public BigDecimal somarVendasPorPeriodo(LocalDate inicio, LocalDate fim){
+        return pedidoRepository.somarVendasPorPeriodo(inicio, fim);
+    }
+
+
+
     private Pedido buscarEntidade(String id) {
         return pedidoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Pedido não encontrado: " + id));

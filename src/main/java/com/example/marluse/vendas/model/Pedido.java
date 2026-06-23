@@ -8,6 +8,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +37,9 @@ public class Pedido extends BaseEntity {
     private BigDecimal valorTotal;
 
     private String observacao;
+
+    @Column(name = "data_vencimento")
+    private LocalDate dataVencimento;
 
     @Builder.Default
     @OneToMany(mappedBy = "pedido", cascade =  CascadeType.ALL, orphanRemoval = true)

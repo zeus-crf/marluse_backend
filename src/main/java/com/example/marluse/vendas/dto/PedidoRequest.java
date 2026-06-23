@@ -1,9 +1,11 @@
 package com.example.marluse.vendas.dto;
 
 import com.example.marluse.vendas.enums.FormaPagamento;
+import com.example.marluse.vendas.enums.StatusPedido;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public record PedidoRequest(
@@ -16,5 +18,9 @@ public record PedidoRequest(
         @NotEmpty(message = "Pedido deve ter ao menos um item")
         List<ItemPedidoRequest> itens,
 
-        String observacao
+        String observacao,
+
+        StatusPedido status,
+
+        LocalDate dataVencimento
 ) {}

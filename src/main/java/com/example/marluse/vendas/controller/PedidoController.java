@@ -1,5 +1,8 @@
 package com.example.marluse.vendas.controller;
 
+import com.example.marluse.clientes.dto.ClienteResponse;
+import com.example.marluse.clientes.service.ClienteService;
+import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.service.ProdutoService;
 import com.example.marluse.shared.ApiResponse;
 import com.example.marluse.vendas.dto.PedidoRequest;
@@ -10,10 +13,14 @@ import com.example.marluse.vendas.service.PedidoService;
 import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 
 @RestController
@@ -22,7 +29,8 @@ import java.util.List;
 public class PedidoController {
 
     private final PedidoService pedidoService;
-
+    private final ClienteService clienteService;
+    private final ProdutoService produtoService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<PedidoResponse>> criar(@Valid @RequestBody PedidoRequest request){
@@ -36,13 +44,30 @@ public class PedidoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<PedidoResponse>> listarPorId(String id){
+    public ResponseEntity<ApiResponse<PedidoResponse>> listarPorId(@PathVariable String id){
         return ResponseEntity.ok(ApiResponse.ok(pedidoService.buscarPorId(id)));
     }
 
     @GetMapping("/status/{status}")
     public ResponseEntity<ApiResponse<List<PedidoResponse>>> listarPorStatus(@PathVariable StatusPedido status) {
         return ResponseEntity.ok(ApiResponse.ok(pedidoService.listarPorStatus(status)));
+    }
+
+    @GetMapping("/clientes")
+    public ResponseEntity<ApiResponse<List<ClienteResponse>>> listarClientes(){
+        return ResponseEntity.ok(ApiResponse.ok(clienteService.listar()));
+    }
+
+    @GetMapping("/produtos")
+    public ResponseEntity<ApiResponse<List<ProdutoResponse>>> listarProdutos(){
+        return ResponseEntity.ok(ApiResponse.ok(produtoService.listar()));
+    }
+
+    @GetMapping("/somar-vendas")
+    public ResponseEntity<ApiResponse<BigDecimal>> somarVendasPorPeriodo(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+            @RequestParam @DateTimeFormat(iso  = DateTimeFormat.ISO.DATE) LocalDate fim){
+        return ResponseEntity.ok(ApiResponse.ok(pedidoService.somarVendasPorPeriodo(inicio, fim)));
     }
 
     @PatchMapping("/{id}/pagar")
