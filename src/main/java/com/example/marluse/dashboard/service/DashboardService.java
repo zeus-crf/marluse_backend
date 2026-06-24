@@ -46,7 +46,7 @@ public class DashboardService {
         List<StatusLocacao> statusAtivos = List.of(StatusLocacao.ATIVA, StatusLocacao.ATRASADA);
         long locacoesAtivas = locacaoRepository.contarLocacoesAtivas(statusAtivos);
 
-        BigDecimal vendasValor = pedidoRepository.somarVendasPorPeriodo(StatusPedido.CONFIRMADO, inicio, fim);
+        BigDecimal vendasValor = pedidoRepository.somarVendasPorPeriodo(inicio, fim);
         long vendasQuantidade = pedidoRepository.contarVendasPorPeriodo(StatusPedido.CONFIRMADO, inicio, fim);
         BigDecimal locacoesAtivasValor = locacaoRepository.somarLocacoesPorPeriodo(statusAtivos, inicio, fim);
 

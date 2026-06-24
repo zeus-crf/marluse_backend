@@ -5,8 +5,10 @@ import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+
 public record PedidoResponse(
         String id,
         String clienteId,
@@ -16,7 +18,8 @@ public record PedidoResponse(
         BigDecimal valorTotal,
         String observacao,
         List<ItemPedidoResponse> itens,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        LocalDate dataVencimento
 ) {
     public static PedidoResponse from(Pedido pedido) {
         return new PedidoResponse(
@@ -28,7 +31,8 @@ public record PedidoResponse(
                 pedido.getValorTotal(),
                 pedido.getObservacao(),
                 pedido.getItens().stream().map(ItemPedidoResponse::from).toList(),
-                pedido.getCreatedAt()
+                pedido.getCreatedAt(),
+                pedido.getDataVencimento()
         );
     }
 }

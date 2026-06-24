@@ -8,7 +8,6 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface PedidoRepository extends JpaRepository<Pedido, String> {
@@ -16,8 +15,10 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
 
     List<Pedido> findByClienteId(String clienteId);
 
-    @Query("SELECT COALESCE(SUM(p.valorTotal), 0) FROM Pedido p WHERE p.status = :status AND CAST(p.createdAt AS date) BETWEEN :inicio AND :fim")
-    BigDecimal somarVendasPorPeriodo(@Param("status") StatusPedido status, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+    @Query("SELECT COALESCE(SUM(p.valorTotal), 0) FROM Pedido p " +
+            "WHERE p.status IN ('CONFIRMADO', 'PAGO') " +
+            "AND CAST(p.createdAt AS date) BETWEEN :inicio AND :fim")
+    BigDecimal somarVendasPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
     @Query("SELECT COUNT(p) FROM Pedido p WHERE p.status = :status AND CAST(p.createdAt AS date) BETWEEN :inicio AND :fim")
     long contarVendasPorPeriodo(@Param("status") StatusPedido status, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
