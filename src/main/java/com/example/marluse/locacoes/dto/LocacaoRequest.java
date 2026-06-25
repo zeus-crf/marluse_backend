@@ -1,5 +1,6 @@
 package com.example.marluse.locacoes.dto;
 
+import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.vendas.enums.FormaPagamento;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -22,7 +23,10 @@ public record LocacaoRequest(
         @NotEmpty(message = "Locação deve ter ao menos um item")
         List<ItemLocacaoRequest> itens,
 
-        String observacao
+        String observacao,
+
+        /** Opcional — quando não informado, padrão é ATIVA */
+        StatusLocacao status
 
 ) {
 }

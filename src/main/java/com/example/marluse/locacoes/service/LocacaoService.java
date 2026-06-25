@@ -6,31 +6,27 @@ import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
 import com.example.marluse.locacoes.dto.ItemLocacaoRequest;
 import com.example.marluse.locacoes.dto.ItemLocacaoResponse;
+import com.example.marluse.locacoes.dto.LocacaoEdicaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoResponse;
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.locacoes.model.ItemLocacao;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
-import com.example.marluse.vendas.dto.ItemPedidoResponse;
-import com.example.marluse.vendas.dto.PedidoResponse;
 import com.example.marluse.vendas.enums.FormaPagamento;
-import com.example.marluse.vendas.model.Pedido;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Status;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @RequiredArgsConstructor
@@ -40,9 +36,10 @@ public class LocacaoService {
     private final ProdutoRepository produtoRepository;
     private final ClienteRepository clienteRepository;
     private final LancamentoFinanceiroService lancamentoService;
+    private final LancamentoFinanceiroRepository lancamentoRepository;
 
     @Transactional
-    public LocacaoResponse criar(LocacaoRequest request){
+    public LocacaoResponse criar(LocacaoRequest request, boolean isOrcamento){
         Cliente cliente = null;
         if (request.clienteId() != null) {
             cliente = clienteRepository.findById(request.clienteId())
@@ -53,11 +50,15 @@ public class LocacaoService {
             throw new IllegalArgumentException("A data de devolução deve ser posterior à data de retirada");
         }
 
+        // Status inicial: query param tem prioridade; fallback para campo do body ou ATIVA
+        StatusLocacao statusInicial = isOrcamento ? StatusLocacao.ORCAMENTO
+                : (request.status() != null ? request.status() : StatusLocacao.ATIVA);
+
         // Calcula os dias entre data de retirada e data de devolução prevista
         long dias = ChronoUnit.DAYS.between(request.dataRetirada(), request.dataDevolucaoPrevista());
 
         Locacao locacao = Locacao.builder()
-                .status(StatusLocacao.ATIVA)
+                .status(statusInicial)
                 .formaPagamento(request.formaPagamento())
                 .dataRetirada(request.dataRetirada())
                 .dataDevolucaoPrevista(request.dataDevolucaoPrevista())
@@ -73,8 +74,13 @@ public class LocacaoService {
             Produto produto = produtoRepository.findById(itemRequest.produtoId())
                     .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
 
-            if (produto.getQuantidadeEstoque() < itemRequest.quantidade()){
-                throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
+            // Orçamento não reserva estoque
+            if (statusInicial != StatusLocacao.ORCAMENTO) {
+                if (produto.getQuantidadeEstoque() < itemRequest.quantidade()){
+                    throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
+                }
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
+                produtoRepository.save(produto);
             }
 
             BigDecimal subtotal = produto.getPreco()
@@ -91,33 +97,31 @@ public class LocacaoService {
 
             locacao.getItens().add(item);
             total = total.add(subtotal);
-
-            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
-            produtoRepository.save(produto);
         }
-
 
         locacao.setValorTotal(total);
         Locacao locacaoSalva = locacaoRepository.save(locacao);
 
-        // Integração financeira
-        String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
-        if (request.formaPagamento() == FormaPagamento.FIADO) {
-            lancamentoService.registarLocacaoReceita(
-                    locacaoSalva,
-                    "Locação fiado - " + nomeCliente,
-                    total,
-                    StatusLancamento.PENDENTE,
-                    locacaoSalva.getDataDevolucaoPrevista().plusDays(1)
-            );
-        } else {
-            lancamentoService.registarLocacaoReceita(
-                    locacaoSalva,
-                    "Locação - " + nomeCliente,
-                    total,
-                    StatusLancamento.PAGO,
-                    LocalDate.now()
-            );
+        // Integração financeira — apenas para locações confirmadas (não orçamento)
+        if (statusInicial != StatusLocacao.ORCAMENTO) {
+            String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+            if (request.formaPagamento() == FormaPagamento.FIADO) {
+                lancamentoService.registarLocacaoReceita(
+                        locacaoSalva,
+                        "Locação fiado - " + nomeCliente,
+                        total,
+                        StatusLancamento.PENDENTE,
+                        locacaoSalva.getDataDevolucaoPrevista().plusDays(1)
+                );
+            } else {
+                lancamentoService.registarLocacaoReceita(
+                        locacaoSalva,
+                        "Locação - " + nomeCliente,
+                        total,
+                        StatusLancamento.PAGO,
+                        LocalDate.now()
+                );
+            }
         }
 
         return toResponse(locacaoSalva);
@@ -151,6 +155,21 @@ public class LocacaoService {
     }
 
     @Transactional
+    public LocacaoResponse editar(String id, LocacaoEdicaoRequest request) {
+        Locacao locacao = locacaoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Locação não encontrada"));
+
+        if (locacao.getStatus() == StatusLocacao.CANCELADA || locacao.getStatus() == StatusLocacao.DEVOLVIDA) {
+            throw new IllegalArgumentException("Não é possível editar uma locação " + locacao.getStatus().name().toLowerCase());
+        }
+
+        locacao.setFormaPagamento(request.formaPagamento());
+        locacao.setObservacao(request.observacao());
+
+        return LocacaoResponse.from(locacaoRepository.save(locacao));
+    }
+
+    @Transactional
     public LocacaoResponse devolver(String id){
         Locacao locacao = locacaoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Locação não encontrada!"));
@@ -168,6 +187,26 @@ public class LocacaoService {
         locacao.setStatus(StatusLocacao.DEVOLVIDA);
         locacao.setDataDevolucaoReal(LocalDate.now());
         return LocacaoResponse.from(locacaoRepository.save(locacao));
+    }
+
+    @Transactional
+    public void deletar(String id) {
+        Locacao locacao = locacaoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Locação não encontrada"));
+
+        // Restaura estoque se ainda estava em uso
+        if (locacao.getStatus() == StatusLocacao.ATIVA || locacao.getStatus() == StatusLocacao.ATRASADA) {
+            for (ItemLocacao item : locacao.getItens()) {
+                Produto produto = item.getProduto();
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                produtoRepository.save(produto);
+            }
+        }
+
+        // Remove lançamentos financeiros vinculados antes de apagar a locação
+        lancamentoRepository.deleteByLocacaoId(id);
+
+        locacaoRepository.delete(locacao);
     }
 
     @Transactional

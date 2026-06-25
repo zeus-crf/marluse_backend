@@ -224,6 +224,12 @@ public class PedidoService {
 
 
 
+    @Transactional
+    public void excluir(String id) {
+        Pedido pedido = buscarEntidade(id);
+        pedidoRepository.delete(pedido);
+    }
+
     private Pedido buscarEntidade(String id) {
         return pedidoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Pedido não encontrado: " + id));

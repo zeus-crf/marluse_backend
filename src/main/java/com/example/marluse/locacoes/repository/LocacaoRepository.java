@@ -3,6 +3,7 @@ package com.example.marluse.locacoes.repository;
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.locacoes.model.Locacao;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,6 +18,8 @@ public interface LocacaoRepository extends JpaRepository<Locacao, String> {
 
     List<Locacao> findByStatus(StatusLocacao status);
 
+    List<Locacao> findByStatusIn(List<StatusLocacao> statusList);
+
     List<Locacao> findByClienteId(String clienteId);
 
     List<Locacao> findByStatusAndDataDevolucaoPrevistaBefore(StatusLocacao status, LocalDate data);
@@ -29,4 +32,10 @@ public interface LocacaoRepository extends JpaRepository<Locacao, String> {
 
     @Query("SELECT CAST(l.createdAt AS date), COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE CAST(l.createdAt AS date) BETWEEN :inicio AND :fim GROUP BY CAST(l.createdAt AS date)")
     List<Object[]> somarLocacoesAgrupadoPorDia(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    @Modifying
+    @Query("UPDATE Locacao l SET l.status = :novo WHERE l.status = :atual AND l.dataDevolucaoPrevista < :hoje")
+    int marcarAtrasadas(@Param("atual") StatusLocacao atual,
+                        @Param("novo")  StatusLocacao novo,
+                        @Param("hoje")  LocalDate hoje);
 }

@@ -18,6 +18,8 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
     Optional<LancamentoFinanceiro> findByPedidoId(String pedidoId);
 
+    void deleteByLocacaoId(String locacaoId);
+
     List<LancamentoFinanceiro> findByDataVencimentoBetween(LocalDate inicio, LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = :tipo AND l.status = 'PAGO' AND l.dataPagamento = :data")

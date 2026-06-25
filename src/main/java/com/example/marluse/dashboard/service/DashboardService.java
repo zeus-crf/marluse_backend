@@ -110,7 +110,7 @@ public class DashboardService {
     }
 
     public List<LocacaoEmCursoResponse> getLocacoesEmCurso() {
-        return locacaoRepository.findByStatus(StatusLocacao.ATIVA)
+        return locacaoRepository.findByStatusIn(List.of(StatusLocacao.ATIVA, StatusLocacao.ATRASADA))
                 .stream()
                 .map(l -> new LocacaoEmCursoResponse(
                         l.getId(),

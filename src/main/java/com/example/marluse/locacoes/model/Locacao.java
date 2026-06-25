@@ -25,7 +25,7 @@ public class Locacao extends BaseEntity {
     @JoinColumn(name = "cliente_id")
     private Cliente cliente;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "VARCHAR(20)")
     @Enumerated(EnumType.STRING)
     private StatusLocacao status;
 

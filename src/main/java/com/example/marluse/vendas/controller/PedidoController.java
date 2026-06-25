@@ -88,4 +88,10 @@ public class PedidoController {
         return ResponseEntity.ok(ApiResponse.ok("Pedido cancelado", pedidoService.cancelar(id)));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable String id) {
+        pedidoService.excluir(id);
+        return ResponseEntity.noContent().build();
+    }
+
 }
