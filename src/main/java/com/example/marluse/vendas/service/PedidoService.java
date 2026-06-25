@@ -9,6 +9,7 @@ import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
 import com.example.marluse.vendas.dto.ItemPedidoRequest;
 import com.example.marluse.vendas.dto.ItemPedidoResponse;
+import com.example.marluse.vendas.dto.PedidoAtualizarRequest;
 import com.example.marluse.vendas.dto.PedidoRequest;
 import com.example.marluse.vendas.dto.PedidoResponse;
 import com.example.marluse.vendas.enums.FormaPagamento;
@@ -207,6 +208,14 @@ public class PedidoService {
                 pedido.getCreatedAt(),
                 pedido.getDataVencimento()
         );
+    }
+
+    @Transactional
+    public PedidoResponse atualizar(String id, PedidoAtualizarRequest request) {
+        Pedido pedido = buscarEntidade(id);
+        if (request.formaPagamento() != null) pedido.setFormaPagamento(request.formaPagamento());
+        if (request.observacao() != null) pedido.setObservacao(request.observacao());
+        return toResponse(pedidoRepository.save(pedido));
     }
 
     public BigDecimal somarVendasPorPeriodo(LocalDate inicio, LocalDate fim){
