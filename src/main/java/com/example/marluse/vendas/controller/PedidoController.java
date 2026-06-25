@@ -5,6 +5,7 @@ import com.example.marluse.clientes.service.ClienteService;
 import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.service.ProdutoService;
 import com.example.marluse.shared.ApiResponse;
+import com.example.marluse.vendas.dto.PedidoAtualizarRequest;
 import com.example.marluse.vendas.dto.PedidoRequest;
 import com.example.marluse.vendas.dto.PedidoResponse;
 import com.example.marluse.vendas.enums.StatusPedido;
@@ -68,6 +69,13 @@ public class PedidoController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso  = DateTimeFormat.ISO.DATE) LocalDate fim){
         return ResponseEntity.ok(ApiResponse.ok(pedidoService.somarVendasPorPeriodo(inicio, fim)));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<PedidoResponse>> atualizar(
+            @PathVariable String id,
+            @Valid @RequestBody PedidoAtualizarRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok("Pedido atualizado", pedidoService.atualizar(id, request)));
     }
 
     @PatchMapping("/{id}/pagar")
