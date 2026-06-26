@@ -5,20 +5,27 @@ import com.example.marluse.clientes.dto.ClienteRequest;
 import com.example.marluse.clientes.dto.ClienteResponse;
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
+import com.example.marluse.locacoes.repository.LocacaoRepository;
+import com.example.marluse.vendas.repository.PedidoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ClienteService {
 
     private final ClienteRepository clienteRepository;
+    private final PedidoRepository pedidoRepository;
+    private final LocacaoRepository locacaoRepository;
 
-    public ClienteResponse criar(ClienteRequest request){
-        if ( request.cpfCnpj() != null && clienteRepository.existsByCpfCnpj(request.cpfCnpj())){
+    public ClienteResponse criar(ClienteRequest request) {
+        if (request.cpfCnpj() != null && clienteRepository.existsByCpfCnpj(request.cpfCnpj())) {
             throw new IllegalArgumentException("CPF/CNPJ já cadastrado");
         }
 
@@ -35,30 +42,41 @@ public class ClienteService {
         return ClienteResponse.from(clienteRepository.save(cliente));
     }
 
-    public List<ClienteResponse> listar(){
-        return clienteRepository.findAll()
-                .stream()
-                .map(ClienteResponse::from)
-                .toList();
+    public List<ClienteResponse> listar() {
+        Map<String, BigDecimal> totalPedidos = pedidoRepository.somarPorTodosClientes()
+                .stream().collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> (BigDecimal) row[1]
+                ));
+
+        Map<String, BigDecimal> totalLocacoes = locacaoRepository.somarPorTodosClientes()
+                .stream().collect(Collectors.toMap(
+                        row -> (String) row[0],
+                        row -> (BigDecimal) row[1]
+                ));
+
+        return clienteRepository.findAll().stream().map(c -> {
+            BigDecimal gasto = totalPedidos.getOrDefault(c.getId(), BigDecimal.ZERO)
+                    .add(totalLocacoes.getOrDefault(c.getId(), BigDecimal.ZERO));
+            return ClienteResponse.from(c, gasto);
+        }).toList();
     }
 
-    public ClienteResponse listarPorId(String id){
+    public ClienteResponse listarPorId(String id) {
         return clienteRepository.findById(id)
                 .map(ClienteResponse::from)
                 .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
-
-
     }
 
     public ClienteResponse atualizar(String id, ClienteAtualizarRequest request) {
         Cliente cliente = clienteRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
 
-        if (request.nome() != null ) cliente.setNome(request.nome());
-        if (request.cpfCnpj() != null ) cliente.setCpfCnpj(request.cpfCnpj());
-        if (request.telefone() != null ) cliente.setTelefone(request.telefone());
-        if (request.email() != null ) cliente.setEmail(request.email());
-        if (request.endereco() != null ) cliente.setEndereco(request.endereco());
+        if (request.nome()     != null) cliente.setNome(request.nome());
+        if (request.cpfCnpj()  != null) cliente.setCpfCnpj(request.cpfCnpj());
+        if (request.telefone() != null) cliente.setTelefone(request.telefone());
+        if (request.email()    != null) cliente.setEmail(request.email());
+        if (request.endereco() != null) cliente.setEndereco(request.endereco());
 
         return ClienteResponse.from(clienteRepository.save(cliente));
     }
