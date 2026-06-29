@@ -174,11 +174,17 @@ public class PedidoService {
             throw new IllegalArgumentException("Pedido já está cancelado");
         }
 
+
         for (ItemPedido item : pedido.getItens()) {
             Produto produto = item.getProduto();
             produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
             produtoRepository.save(produto);
         }
+
+        lancamentoRepository.findByPedidoId(id).ifPresent(l -> {
+            l.setStatus(StatusLancamento.CANCELADO);
+            lancamentoRepository.save(l);
+        });
 
         pedido.setStatus(StatusPedido.CANCELADO);
         return toResponse(pedidoRepository.save(pedido));

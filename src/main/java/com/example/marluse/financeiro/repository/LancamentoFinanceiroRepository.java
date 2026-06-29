@@ -18,6 +18,8 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
     Optional<LancamentoFinanceiro> findByPedidoId(String pedidoId);
 
+    Optional<LancamentoFinanceiro> findByLocacaoId(String locacaoId);
+
     void deleteByLocacaoId(String locacaoId);
 
     List<LancamentoFinanceiro> findByDataVencimentoBetween(LocalDate inicio, LocalDate fim);

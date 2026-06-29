@@ -227,6 +227,11 @@ public class LocacaoService {
             }
         }
 
+        lancamentoRepository.findByLocacaoId(id).ifPresent(l -> {
+            l.setStatus(StatusLancamento.CANCELADO);
+            lancamentoRepository.save(l);
+        });
+
         locacao.setStatus(StatusLocacao.CANCELADA);
         return LocacaoResponse.from(locacaoRepository.save(locacao));
     }
