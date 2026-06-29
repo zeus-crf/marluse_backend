@@ -1,6 +1,7 @@
 package com.example.marluse.financeiro.model;
 
 import com.example.marluse.clientes.model.Cliente;
+import com.example.marluse.financeiro.enums.Recorrencia;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.enums.TipoLancamento;
 import com.example.marluse.locacoes.model.Locacao;
@@ -44,6 +45,16 @@ public class LancamentoFinanceiro extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private StatusLancamento status = StatusLancamento.PENDENTE;
+
+    @Enumerated(EnumType.STRING)
+    private Recorrencia recorrencia;
+
+    @Column(name = "recorrencia_grupo_id")
+    private String recorrenciaGrupoId;
+
+    @Column(name = "recorrencia_ativa")
+    @Builder.Default
+    private boolean recorrenciaAtiva = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id")
