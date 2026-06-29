@@ -1,5 +1,6 @@
 package com.example.marluse.financeiro.service;
 
+import com.example.marluse.financeiro.dto.LancamentoAtualizarRequest;
 import com.example.marluse.financeiro.dto.LancamentoFinanceiroRequest;
 import com.example.marluse.financeiro.dto.LancamentoFinanceiroResponse;
 import com.example.marluse.financeiro.dto.ResumoDiaResponse;
@@ -95,6 +96,21 @@ public class LancamentoFinanceiroService {
 
     }
 
+
+    @Transactional
+    public LancamentoFinanceiroResponse atualizar(String id, LancamentoAtualizarRequest request) {
+        LancamentoFinanceiro lancamento = buscarEntidade(id);
+
+        if (request.tipo()           != null) lancamento.setTipo(request.tipo());
+        if (request.categoria()      != null) lancamento.setCategoria(request.categoria());
+        if (request.descricao()      != null) lancamento.setDescricao(request.descricao());
+        if (request.valor()          != null) lancamento.setValor(request.valor());
+        if (request.status()         != null) lancamento.setStatus(request.status());
+        if (request.dataVencimento() != null) lancamento.setDataVencimento(request.dataVencimento());
+        if (request.dataPagamento()  != null) lancamento.setDataPagamento(request.dataPagamento());
+
+        return LancamentoFinanceiroResponse.from(lancamentoFinanceiroRepository.save(lancamento));
+    }
 
     @Transactional
     public void deletar(String id) {

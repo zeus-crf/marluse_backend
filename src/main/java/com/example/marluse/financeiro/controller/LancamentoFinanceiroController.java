@@ -1,5 +1,6 @@
 package com.example.marluse.financeiro.controller;
 
+import com.example.marluse.financeiro.dto.LancamentoAtualizarRequest;
 import com.example.marluse.financeiro.dto.LancamentoFinanceiroRequest;
 import com.example.marluse.financeiro.dto.LancamentoFinanceiroResponse;
 import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
@@ -45,6 +46,13 @@ public class LancamentoFinanceiroController {
     @GetMapping("/vencidos")
     public ResponseEntity<ApiResponse<List<LancamentoFinanceiroResponse>>> listarVencidos() {
         return ResponseEntity.ok(ApiResponse.ok(lancamentoService.listarVencidos()));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<LancamentoFinanceiroResponse>> atualizar(
+            @PathVariable String id,
+            @Valid @RequestBody LancamentoAtualizarRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok("Lançamento atualizado", lancamentoService.atualizar(id, request)));
     }
 
     @PatchMapping("/{id}/pagar")
