@@ -11,6 +11,7 @@ import java.util.List;
 
 public record LocacaoResponse(
         String id,
+        Long numero,
         String clienteId,
         String clienteNome,
         StatusLocacao status,
@@ -26,6 +27,7 @@ public record LocacaoResponse(
     public static LocacaoResponse from(Locacao locacao) {
         return new LocacaoResponse(
                 locacao.getId(),
+                locacao.getNumero(),
                 locacao.getCliente() != null ? locacao.getCliente().getId() : null,
                 locacao.getCliente() != null ? locacao.getCliente().getNome() : "Consumidor Final",
                 locacao.getStatus(),
