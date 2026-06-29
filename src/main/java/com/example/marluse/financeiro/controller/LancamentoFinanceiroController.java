@@ -43,6 +43,11 @@ public class LancamentoFinanceiroController {
         return ResponseEntity.ok(ApiResponse.ok(lancamentoService.listarPendentes()));
     }
 
+    @GetMapping("/recorrencia/{grupoId}")
+    public ResponseEntity<ApiResponse<List<LancamentoFinanceiroResponse>>> listarGrupoId(@PathVariable String grupoId) {
+        return ResponseEntity.ok(ApiResponse.ok(lancamentoService.listarLancamentosGrupoId(grupoId)));
+    }
+
     @GetMapping("/vencidos")
     public ResponseEntity<ApiResponse<List<LancamentoFinanceiroResponse>>> listarVencidos() {
         return ResponseEntity.ok(ApiResponse.ok(lancamentoService.listarVencidos()));
@@ -64,6 +69,12 @@ public class LancamentoFinanceiroController {
     @GetMapping("/resumo-dia")
     public ResponseEntity<ApiResponse<Object>> resumoDia() {
         return ResponseEntity.ok(ApiResponse.ok(lancamentoService.resumoDia()));
+    }
+
+    @PatchMapping("/recorrencia/{grupoId}/cancelar")
+    public ResponseEntity<ApiResponse<Void>> cancelarRecorrencia(@PathVariable String grupoId) {
+        lancamentoService.cancelarRecorrencia(grupoId);
+        return ResponseEntity.ok(ApiResponse.ok("Recorrência cancelada", null));
     }
 
     @DeleteMapping("/{id}")

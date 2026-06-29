@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +48,11 @@ public class LancamentoFinanceiroService {
                 .cliente(cliente)
                 .build();
 
+        if (request.recorrencia() != null) {
+            lancamento.setRecorrencia(request.recorrencia());
+            lancamento.setRecorrenciaGrupoId(UUID.randomUUID().toString());
+        }
+
         return LancamentoFinanceiroResponse.from(lancamentoFinanceiroRepository.save(lancamento));
     }
 
@@ -73,6 +79,13 @@ public class LancamentoFinanceiroService {
 
     public List<LancamentoFinanceiroResponse> listarVencidos() {
         return lancamentoFinanceiroRepository.findVencidos(LocalDate.now())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<LancamentoFinanceiroResponse> listarLancamentosGrupoId(String grupoId) {
+        return  lancamentoFinanceiroRepository.findByRecorrenciaGrupoId(grupoId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -163,21 +176,34 @@ public class LancamentoFinanceiroService {
         lancamentoFinanceiroRepository.save(lancamento);
     }
 
+
+
+
+    @Transactional
+    public void cancelarRecorrencia(String grupoId) {
+        List<LancamentoFinanceiro> lancamentos = lancamentoFinanceiroRepository
+                .findByRecorrenciaGrupoId(grupoId);
+
+        List<LancamentoFinanceiro> paraDesativar = lancamentos.stream()
+                .filter(l -> l.getStatus() != StatusLancamento.PENDENTE)
+                .peek(l -> l.setRecorrenciaAtiva(false))
+                .toList();
+
+        List<LancamentoFinanceiro> paraDeletar = lancamentos.stream()
+                .filter(l -> l.getStatus() == StatusLancamento.PENDENTE)
+                .toList();
+
+        lancamentoFinanceiroRepository.saveAll(paraDesativar);
+        lancamentoFinanceiroRepository.deleteAll(paraDeletar);
+    }
+
     private LancamentoFinanceiro buscarEntidade(String id) {
         return lancamentoFinanceiroRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Lançamento não encontrado: " + id));
     }
 
     private LancamentoFinanceiroResponse toResponse(LancamentoFinanceiro l) {
-        return new LancamentoFinanceiroResponse(
-                l.getId(), l.getTipo(), l.getCategoria(), l.getDescricao(),
-                l.getValor(), l.getDataVencimento(), l.getDataPagamento(), l.getStatus(),
-                l.getPedido() != null ? l.getPedido().getId() : null,
-                l.getPedido() != null ? l.getPedido().getCliente().getNome(): null,
-                l.getLocacao() != null ? l.getLocacao().getId() : null,
-                l.getLocacao() != null ? l.getLocacao().getCliente().getNome() : null,
-                l.getCreatedAt()
-        );
+        return LancamentoFinanceiroResponse.from(l);
     }
 
 
