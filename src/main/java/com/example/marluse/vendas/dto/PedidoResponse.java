@@ -26,7 +26,7 @@ public record PedidoResponse(
                 pedido.getId(),
                 pedido.getCliente() != null ? pedido.getCliente().getId() : null,
                 pedido.getCliente() != null ? pedido.getCliente().getNome() : "Consumidor Final",
-                pedido.getStatus(),
+                statusEfetivo(pedido),
                 pedido.getFormaPagamento(),
                 pedido.getValorTotal(),
                 pedido.getObservacao(),
@@ -34,5 +34,15 @@ public record PedidoResponse(
                 pedido.getCreatedAt(),
                 pedido.getDataVencimento()
         );
+    }
+
+    private static StatusPedido statusEfetivo(Pedido pedido) {
+        if (pedido.getStatus() == StatusPedido.CONFIRMADO
+                && pedido.getFormaPagamento() == FormaPagamento.FIADO
+                && pedido.getDataVencimento() != null
+                && pedido.getDataVencimento().isBefore(LocalDate.now())) {
+            return StatusPedido.PENDENTE;
+        }
+        return pedido.getStatus();
     }
 }

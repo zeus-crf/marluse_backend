@@ -33,7 +33,7 @@ public interface LocacaoRepository extends JpaRepository<Locacao, String> {
     @Query("SELECT CAST(l.createdAt AS date), COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE CAST(l.createdAt AS date) BETWEEN :inicio AND :fim GROUP BY CAST(l.createdAt AS date)")
     List<Object[]> somarLocacoesAgrupadoPorDia(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
-    @Query("SELECT l.cliente.id, COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE l.cliente IS NOT NULL AND l.status IN ('ATIVA', 'DEVOLVIDA', 'ATRASADA') GROUP BY l.cliente.id")
+    @Query("SELECT l.cliente.id, COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE l.cliente IS NOT NULL AND l.status = 'DEVOLVIDA' GROUP BY l.cliente.id")
     List<Object[]> somarPorTodosClientes();
 
     @Modifying

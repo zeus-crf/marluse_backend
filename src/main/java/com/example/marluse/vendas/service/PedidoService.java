@@ -184,30 +184,8 @@ public class PedidoService {
         return toResponse(pedidoRepository.save(pedido));
     }
 
-    private PedidoResponse toResponse (Pedido pedido){
-
-        List<ItemPedidoResponse> itens = pedido.getItens().stream()
-                .map(item -> new ItemPedidoResponse(
-                        item.getId(),
-                        item.getProduto().getId(),
-                        item.getProduto().getNome(),
-                        item.getQuantidade(),
-                        item.getPrecoUnitario(),
-                        item.getSubTotal()
-                ))
-                .toList();
-        return new PedidoResponse(
-                pedido.getId(),
-                pedido.getCliente() != null ? pedido.getCliente().getId() : null,
-                pedido.getCliente() != null ? pedido.getCliente().getNome() : "Consumidor Final",
-                pedido.getStatus(),
-                pedido.getFormaPagamento(),
-                pedido.getValorTotal(),
-                pedido.getObservacao(),
-                itens,
-                pedido.getCreatedAt(),
-                pedido.getDataVencimento()
-        );
+    private PedidoResponse toResponse(Pedido pedido) {
+        return PedidoResponse.from(pedido);
     }
 
     @Transactional
@@ -227,6 +205,7 @@ public class PedidoService {
     @Transactional
     public void excluir(String id) {
         Pedido pedido = buscarEntidade(id);
+        lancamentoRepository.findByPedidoId(id).ifPresent(lancamentoRepository::delete);
         pedidoRepository.delete(pedido);
     }
 
