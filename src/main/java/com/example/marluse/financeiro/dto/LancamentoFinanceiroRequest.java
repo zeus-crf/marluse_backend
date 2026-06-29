@@ -14,7 +14,8 @@ public record LancamentoFinanceiroRequest(
         @NotBlank String categoria,
         @NotBlank String descricao,
         @NotNull @DecimalMin("0.01") BigDecimal valor,
-        @NotNull StatusLancamento status,       // 5º
-        LocalDate dataPagamento,               // 6º
-        LocalDate dataVencimento               // 7º
+        @NotNull StatusLancamento status,
+        LocalDate dataPagamento,
+        LocalDate dataVencimento,
+        String clienteId
 ) {}

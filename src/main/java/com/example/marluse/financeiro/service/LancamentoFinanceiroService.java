@@ -1,5 +1,7 @@
 package com.example.marluse.financeiro.service;
 
+import com.example.marluse.clientes.model.Cliente;
+import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.financeiro.dto.LancamentoAtualizarRequest;
 import com.example.marluse.financeiro.dto.LancamentoFinanceiroRequest;
 import com.example.marluse.financeiro.dto.LancamentoFinanceiroResponse;
@@ -24,9 +26,16 @@ import java.util.List;
 public class LancamentoFinanceiroService {
 
     private final LancamentoFinanceiroRepository lancamentoFinanceiroRepository;
+    private final ClienteRepository clienteRepository;
 
     @Transactional
-    public LancamentoFinanceiroResponse criar (LancamentoFinanceiroRequest request){
+    public LancamentoFinanceiroResponse criar(LancamentoFinanceiroRequest request) {
+        Cliente cliente = null;
+        if (request.clienteId() != null) {
+            cliente = clienteRepository.findById(request.clienteId())
+                    .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
+        }
+
         LancamentoFinanceiro lancamento = LancamentoFinanceiro.builder()
                 .tipo(request.tipo())
                 .categoria(request.categoria())
@@ -34,7 +43,8 @@ public class LancamentoFinanceiroService {
                 .valor(request.valor())
                 .dataVencimento(request.dataVencimento())
                 .dataPagamento(request.dataPagamento())
-                .status(request.status() != null ? request.status(): StatusLancamento.PENDENTE)
+                .status(request.status() != null ? request.status() : StatusLancamento.PENDENTE)
+                .cliente(cliente)
                 .build();
 
         return LancamentoFinanceiroResponse.from(lancamentoFinanceiroRepository.save(lancamento));
@@ -120,7 +130,7 @@ public class LancamentoFinanceiroService {
 
 
     public void registrarVendaReceita(Pedido pedido, String descricao, BigDecimal valor,
-                                      StatusLancamento status, LocalDate dataVencimento){
+                                      StatusLancamento status, LocalDate dataVencimento) {
         LancamentoFinanceiro lancamento = LancamentoFinanceiro.builder()
                 .tipo(TipoLancamento.RECEITA)
                 .categoria("Venda")
@@ -129,6 +139,7 @@ public class LancamentoFinanceiroService {
                 .status(status)
                 .dataVencimento(dataVencimento)
                 .dataPagamento(status == StatusLancamento.PAGO ? LocalDate.now() : null)
+                .cliente(pedido.getCliente())
                 .pedido(pedido)
                 .build();
 
@@ -136,7 +147,7 @@ public class LancamentoFinanceiroService {
     }
 
     public void registarLocacaoReceita(Locacao locacao, String descricao, BigDecimal valor,
-                                       StatusLancamento status, LocalDate dataVencimento){
+                                       StatusLancamento status, LocalDate dataVencimento) {
         LancamentoFinanceiro lancamento = LancamentoFinanceiro.builder()
                 .tipo(TipoLancamento.RECEITA)
                 .categoria("Locação")
@@ -145,6 +156,7 @@ public class LancamentoFinanceiroService {
                 .status(status)
                 .dataVencimento(dataVencimento)
                 .dataPagamento(status == StatusLancamento.PAGO ? LocalDate.now() : null)
+                .cliente(locacao.getCliente())
                 .locacao(locacao)
                 .build();
 
@@ -161,7 +173,9 @@ public class LancamentoFinanceiroService {
                 l.getId(), l.getTipo(), l.getCategoria(), l.getDescricao(),
                 l.getValor(), l.getDataVencimento(), l.getDataPagamento(), l.getStatus(),
                 l.getPedido() != null ? l.getPedido().getId() : null,
+                l.getPedido() != null ? l.getPedido().getCliente().getNome(): null,
                 l.getLocacao() != null ? l.getLocacao().getId() : null,
+                l.getLocacao() != null ? l.getLocacao().getCliente().getNome() : null,
                 l.getCreatedAt()
         );
     }

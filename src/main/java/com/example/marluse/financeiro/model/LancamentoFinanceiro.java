@@ -1,5 +1,6 @@
 package com.example.marluse.financeiro.model;
 
+import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.enums.TipoLancamento;
 import com.example.marluse.locacoes.model.Locacao;
@@ -43,6 +44,10 @@ public class LancamentoFinanceiro extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private StatusLancamento status = StatusLancamento.PENDENTE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_id")
+    private Cliente cliente;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pedido_id")

@@ -17,6 +17,8 @@ public record LancamentoFinanceiroResponse(
         LocalDate dataVencimento,
         LocalDate dataPagamento,
         StatusLancamento status,
+        String clienteId,
+        String clienteNome,
         String pedidoId,
         String locacaoId,
         LocalDateTime createdAt
@@ -31,6 +33,8 @@ public record LancamentoFinanceiroResponse(
                 l.getDataVencimento(),
                 l.getDataPagamento(),
                 l.getStatus(),
+                l.getCliente() != null ? l.getCliente().getId() : null,
+                l.getCliente() != null ? l.getCliente().getNome() : null,
                 l.getPedido() != null ? l.getPedido().getId() : null,
                 l.getLocacao() != null ? l.getLocacao().getId() : null,
                 l.getCreatedAt()
