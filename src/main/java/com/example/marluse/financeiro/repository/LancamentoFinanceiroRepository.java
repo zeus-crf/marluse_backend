@@ -1,5 +1,6 @@
 package com.example.marluse.financeiro.repository;
 
+import com.example.marluse.financeiro.dto.LancamentoFinanceiroResponse;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.enums.TipoLancamento;
 import com.example.marluse.financeiro.model.LancamentoFinanceiro;
@@ -41,10 +42,11 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
         SELECT MAX(l2.dataVencimento)
         FROM LancamentoFinanceiro l2
         WHERE l2.recorrenciaGrupoId = l.recorrenciaGrupoId
-        WHERE l2.recorrenciaGrupoId = l.recorrenciaGrupoId
     )
     """)
     List<LancamentoFinanceiro> findUltimosPorGrupoAtivo();
 
     List<LancamentoFinanceiro> findByRecorrenciaGrupoId(String recorrenciaGrupoId);
+
+
 }

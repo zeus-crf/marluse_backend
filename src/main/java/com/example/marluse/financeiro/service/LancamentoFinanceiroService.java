@@ -84,6 +84,13 @@ public class LancamentoFinanceiroService {
                 .toList();
     }
 
+    public List<LancamentoFinanceiroResponse> listarLancamentosGrupoId(String grupoId) {
+        return  lancamentoFinanceiroRepository.findByRecorrenciaGrupoId(grupoId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public LancamentoFinanceiroResponse pagar(String id){
         LancamentoFinanceiro lancamento = lancamentoFinanceiroRepository.findById(id)
@@ -172,8 +179,22 @@ public class LancamentoFinanceiroService {
 
 
 
-    public void cancelarRecorrencia (String gru) {
+    @Transactional
+    public void cancelarRecorrencia(String grupoId) {
+        List<LancamentoFinanceiro> lancamentos = lancamentoFinanceiroRepository
+                .findByRecorrenciaGrupoId(grupoId);
 
+        List<LancamentoFinanceiro> paraDesativar = lancamentos.stream()
+                .filter(l -> l.getStatus() != StatusLancamento.PENDENTE)
+                .peek(l -> l.setRecorrenciaAtiva(false))
+                .toList();
+
+        List<LancamentoFinanceiro> paraDeletar = lancamentos.stream()
+                .filter(l -> l.getStatus() == StatusLancamento.PENDENTE)
+                .toList();
+
+        lancamentoFinanceiroRepository.saveAll(paraDesativar);
+        lancamentoFinanceiroRepository.deleteAll(paraDeletar);
     }
 
     private LancamentoFinanceiro buscarEntidade(String id) {
@@ -182,18 +203,7 @@ public class LancamentoFinanceiroService {
     }
 
     private LancamentoFinanceiroResponse toResponse(LancamentoFinanceiro l) {
-        return new LancamentoFinanceiroResponse(
-                l.getId(), l.getTipo(), l.getCategoria(), l.getDescricao(),
-                l.getValor(), l.getDataVencimento(), l.getDataPagamento(), l.getStatus(),
-                l.getPedido() != null ? l.getPedido().getId() : null,
-                l.getRecorrencia() != null ? l.getRecorrencia() : null,
-                l.getRecorrenciaGrupoId() != null ? l.getRecorrenciaGrupoId() : null,
-                l.isRecorrenciaAtiva(),
-                l.getPedido() != null ? l.getPedido().getCliente().getNome(): null,
-                l.getLocacao() != null ? l.getLocacao().getId() : null,
-                l.getLocacao() != null ? l.getLocacao().getCliente().getNome() : null,
-                l.getCreatedAt()
-        );
+        return LancamentoFinanceiroResponse.from(l);
     }
 
 

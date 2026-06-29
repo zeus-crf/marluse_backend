@@ -54,7 +54,7 @@ public class LancamentoFinanceiro extends BaseEntity {
 
     @Column(name = "recorrencia_ativa")
     @Builder.Default
-    private boolean recorrenciaAtiva = true;
+    private Boolean recorrenciaAtiva = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id")

@@ -40,7 +40,7 @@ public record LancamentoFinanceiroResponse(
                 l.getCliente() != null ? l.getCliente().getId() : null,
                 l.getRecorrencia(),
                 l.getRecorrenciaGrupoId(),
-                l.isRecorrenciaAtiva(),
+                Boolean.TRUE.equals(l.getRecorrenciaAtiva()),
                 l.getCliente() != null ? l.getCliente().getNome() : null,
                 l.getPedido() != null ? l.getPedido().getId() : null,
                 l.getLocacao() != null ? l.getLocacao().getId() : null,
