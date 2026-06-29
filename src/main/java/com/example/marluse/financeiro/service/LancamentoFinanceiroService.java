@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -46,6 +47,11 @@ public class LancamentoFinanceiroService {
                 .status(request.status() != null ? request.status() : StatusLancamento.PENDENTE)
                 .cliente(cliente)
                 .build();
+
+        if (request.recorrencia() != null) {
+            lancamento.setRecorrencia(request.recorrencia());
+            lancamento.setRecorrenciaGrupoId(UUID.randomUUID().toString());
+        }
 
         return LancamentoFinanceiroResponse.from(lancamentoFinanceiroRepository.save(lancamento));
     }
@@ -163,6 +169,13 @@ public class LancamentoFinanceiroService {
         lancamentoFinanceiroRepository.save(lancamento);
     }
 
+
+
+
+    public void cancelarRecorrencia (String gru) {
+
+    }
+
     private LancamentoFinanceiro buscarEntidade(String id) {
         return lancamentoFinanceiroRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Lançamento não encontrado: " + id));
@@ -173,6 +186,9 @@ public class LancamentoFinanceiroService {
                 l.getId(), l.getTipo(), l.getCategoria(), l.getDescricao(),
                 l.getValor(), l.getDataVencimento(), l.getDataPagamento(), l.getStatus(),
                 l.getPedido() != null ? l.getPedido().getId() : null,
+                l.getRecorrencia() != null ? l.getRecorrencia() : null,
+                l.getRecorrenciaGrupoId() != null ? l.getRecorrenciaGrupoId() : null,
+                l.isRecorrenciaAtiva(),
                 l.getPedido() != null ? l.getPedido().getCliente().getNome(): null,
                 l.getLocacao() != null ? l.getLocacao().getId() : null,
                 l.getLocacao() != null ? l.getLocacao().getCliente().getNome() : null,

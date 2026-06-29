@@ -1,5 +1,6 @@
 package com.example.marluse.financeiro.dto;
 
+import com.example.marluse.financeiro.enums.Recorrencia;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.enums.TipoLancamento;
 import jakarta.validation.constraints.DecimalMin;
@@ -15,6 +16,7 @@ public record LancamentoFinanceiroRequest(
         @NotBlank String descricao,
         @NotNull @DecimalMin("0.01") BigDecimal valor,
         @NotNull StatusLancamento status,
+        Recorrencia recorrencia,
         LocalDate dataPagamento,
         LocalDate dataVencimento,
         String clienteId

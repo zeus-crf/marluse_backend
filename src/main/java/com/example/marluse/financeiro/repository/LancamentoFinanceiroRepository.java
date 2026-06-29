@@ -32,4 +32,19 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarReceitaPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    @Query("""
+    SELECT l FROM LancamentoFinanceiro l
+    WHERE l.recorrencia IS NOT NULL
+    AND l.recorrenciaAtiva = true
+    AND l.dataVencimento = (
+        SELECT MAX(l2.dataVencimento)
+        FROM LancamentoFinanceiro l2
+        WHERE l2.recorrenciaGrupoId = l.recorrenciaGrupoId
+        WHERE l2.recorrenciaGrupoId = l.recorrenciaGrupoId
+    )
+    """)
+    List<LancamentoFinanceiro> findUltimosPorGrupoAtivo();
+
+    List<LancamentoFinanceiro> findByRecorrenciaGrupoId(String recorrenciaGrupoId);
 }
