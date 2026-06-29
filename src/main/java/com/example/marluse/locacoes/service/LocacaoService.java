@@ -184,6 +184,14 @@ public class LocacaoService {
             produtoRepository.save(produto);
         }
 
+        lancamentoRepository.findByLocacaoId(id).ifPresent(l -> {
+            if (l.getStatus() != StatusLancamento.PAGO) {
+                l.setStatus(StatusLancamento.PAGO);
+                l.setDataPagamento(LocalDate.now());
+                lancamentoRepository.save(l);
+            }
+        });
+
         locacao.setStatus(StatusLocacao.DEVOLVIDA);
         locacao.setDataDevolucaoReal(LocalDate.now());
         return LocacaoResponse.from(locacaoRepository.save(locacao));
