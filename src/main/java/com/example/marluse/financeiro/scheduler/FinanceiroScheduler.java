@@ -28,9 +28,10 @@ public class FinanceiroScheduler {
         List<LancamentoFinanceiro> ultimos = lancamentoRepository.findUltimosPorGrupoAtivo();
 
         for (LancamentoFinanceiro ultimo : ultimos ) {
-            LocalDate proximaData = calcularProximaData(ultimo);
+            // Cria o próximo quando o atual vencer (dataVencimento <= hoje)
+            if (!ultimo.getDataVencimento().isAfter(LocalDate.now())) {
+                LocalDate proximaData = calcularProximaData(ultimo);
 
-            if (!proximaData.isAfter(LocalDate.now())){
                 boolean jaExiste = lancamentoRepository
                         .findByRecorrenciaGrupoId(ultimo.getRecorrenciaGrupoId())
                         .stream()
