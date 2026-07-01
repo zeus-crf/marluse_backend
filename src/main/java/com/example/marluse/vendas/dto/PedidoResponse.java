@@ -1,5 +1,6 @@
 package com.example.marluse.vendas.dto;
 
+import com.example.marluse.vendas.enums.TipoDesconto;
 import com.example.marluse.vendas.model.Pedido;
 import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
@@ -20,9 +21,16 @@ public record PedidoResponse(
         String observacao,
         List<ItemPedidoResponse> itens,
         LocalDateTime createdAt,
-        LocalDate dataVencimento
+        LocalDate dataVencimento,
+        BigDecimal valorBruto,
+        BigDecimal desconto,
+        TipoDesconto tipoDesconto
 ) {
     public static PedidoResponse from(Pedido pedido) {
+       BigDecimal bruto = pedido.getItens().stream()
+               .map(i -> i.getPrecoUnitario().multiply(BigDecimal.valueOf(i.getQuantidade())))
+               .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         return new PedidoResponse(
                 pedido.getId(),
                 pedido.getNumero(),
@@ -34,7 +42,11 @@ public record PedidoResponse(
                 pedido.getObservacao(),
                 pedido.getItens().stream().map(ItemPedidoResponse::from).toList(),
                 pedido.getCreatedAt(),
-                pedido.getDataVencimento()
+                pedido.getDataVencimento(),
+                bruto,
+                pedido.getDesconto(),
+                pedido.getTipoDesconto()
+
         );
     }
 

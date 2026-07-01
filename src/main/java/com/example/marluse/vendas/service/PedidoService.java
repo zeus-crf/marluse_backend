@@ -14,6 +14,7 @@ import com.example.marluse.vendas.dto.PedidoRequest;
 import com.example.marluse.vendas.dto.PedidoResponse;
 import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
+import com.example.marluse.vendas.enums.TipoDesconto;
 import com.example.marluse.vendas.model.ItemPedido;
 import com.example.marluse.vendas.model.Pedido;
 import com.example.marluse.vendas.repository.PedidoRepository;
@@ -62,6 +63,7 @@ public class PedidoService {
 
         BigDecimal total = BigDecimal.ZERO;
 
+
         for (ItemPedidoRequest itemRequest : request.itens()) {
             Produto produto = produtoRepository.findById(itemRequest.productId())
                     .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
@@ -89,7 +91,11 @@ public class PedidoService {
             total = total.add(subTotal);
         }
 
-        pedido.setValorTotal(total);
+        pedido.setDesconto(request.desconto());
+        pedido.setTipoDesconto(request.tipoDesconto());
+        BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
+        pedido.setValorTotal(valorFinal);
+
 
         // Gera número sequencial antes de salvar
         long numeroPedido = pedidoRepository.count() + 1;
@@ -204,6 +210,16 @@ public class PedidoService {
         Pedido pedido = buscarEntidade(id);
         if (request.formaPagamento() != null) pedido.setFormaPagamento(request.formaPagamento());
         if (request.observacao() != null) pedido.setObservacao(request.observacao());
+
+        if (request.desconto() != null ) {
+            pedido.setDesconto(request.desconto());
+            pedido.setTipoDesconto(request.tipoDesconto());
+            BigDecimal bruto = pedido.getItens().stream()
+                    .map(i -> i.getPrecoUnitario().multiply(BigDecimal.valueOf(i.getQuantidade())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            pedido.setValorTotal(aplicarDesconto(bruto, request.desconto(), request.tipoDesconto()));
+
+        }
         return toResponse(pedidoRepository.save(pedido));
     }
 
@@ -211,6 +227,19 @@ public class PedidoService {
         return pedidoRepository.somarVendasPorPeriodo(inicio, fim);
     }
 
+    private BigDecimal aplicarDesconto(BigDecimal bruto, BigDecimal desconto, TipoDesconto tipo) {
+        if (desconto == null || desconto.compareTo(BigDecimal.ZERO) == 0) return bruto;
+
+        BigDecimal calc = tipo == TipoDesconto.PERCENTUAL
+                ? bruto.multiply(desconto).divide(BigDecimal.valueOf(100))
+                : desconto;
+
+        BigDecimal resultado = bruto.subtract(calc);
+
+        if (resultado.compareTo(BigDecimal.ZERO) < 0)
+            throw new IllegalArgumentException("Desconto não pode ser maior que o valor total");
+        return resultado;
+    }
 
 
     @Transactional

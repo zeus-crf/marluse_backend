@@ -18,6 +18,7 @@ import com.example.marluse.locacoes.model.ItemLocacao;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
 import com.example.marluse.vendas.enums.FormaPagamento;
+import com.example.marluse.vendas.enums.TipoDesconto;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -99,7 +100,14 @@ public class LocacaoService {
             total = total.add(subtotal);
         }
 
-        locacao.setValorTotal(total);
+
+        locacao.setDesconto(request.desconto());
+        locacao.setTipoDesconto(request.tipoDesconto());
+        BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
+
+        locacao.setValorTotal(valorFinal);
+
+
 
         // Gera número sequencial antes de salvar
         long numeroLocacao = locacaoRepository.count() + 1;
@@ -167,6 +175,15 @@ public class LocacaoService {
 
         if (locacao.getStatus() == StatusLocacao.CANCELADA || locacao.getStatus() == StatusLocacao.DEVOLVIDA) {
             throw new IllegalArgumentException("Não é possível editar uma locação " + locacao.getStatus().name().toLowerCase());
+        }
+
+        if (request.desconto() != null ){
+            locacao.setDesconto(request.desconto());
+            locacao.setTipoDesconto(request.tipoDesconto());
+            BigDecimal bruto = locacao.getItens().stream()
+                    .map(i -> i.getPrecoDiaria().multiply(BigDecimal.valueOf(i.getQuantidade())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            locacao.setValorTotal(aplicarDesconto(bruto, request.desconto(), request.tipoDesconto()));
         }
 
         locacao.setFormaPagamento(request.formaPagamento());
@@ -250,6 +267,19 @@ public class LocacaoService {
         return LocacaoResponse.from(locacaoRepository.save(locacao));
     }
 
+    private BigDecimal aplicarDesconto(BigDecimal bruto, BigDecimal desconto, TipoDesconto tipo) {
+        if (desconto == null || desconto.compareTo(BigDecimal.ZERO) == 0 ) return bruto;
+
+        BigDecimal calc = tipo == TipoDesconto.PERCENTUAL
+                ? bruto.multiply(desconto).divide(BigDecimal.valueOf(100))
+                : desconto;
+
+        BigDecimal resulto = bruto.subtract(calc);
+
+        if (resulto.compareTo(BigDecimal.ZERO) > 0)
+            throw new IllegalArgumentException("Desconto não pode ser maior que o valor total");
+    }
+
     private LocacaoResponse toResponse (Locacao locacao){
 
         List<ItemLocacaoResponse> itens = locacao.getItens().stream()
@@ -275,7 +305,7 @@ public class LocacaoService {
                 locacao.getValorTotal(),
                 locacao.getObservacao(),
                 itens,
-                locacao.getCreatedAt()
+                locacao.getCreatedAt(),
 
         );
     }

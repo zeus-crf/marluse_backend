@@ -2,9 +2,11 @@ package com.example.marluse.locacoes.dto;
 
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.vendas.enums.FormaPagamento;
+import com.example.marluse.vendas.enums.TipoDesconto;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -26,7 +28,11 @@ public record LocacaoRequest(
         String observacao,
 
         /** Opcional — quando não informado, padrão é ATIVA */
-        StatusLocacao status
+        StatusLocacao status,
+
+        BigDecimal desconto,
+
+        TipoDesconto tipoDesconto
 
 ) {
 }
