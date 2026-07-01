@@ -4,6 +4,7 @@ import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.shared.BaseEntity;
 import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
+import com.example.marluse.vendas.enums.TipoDesconto;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -43,6 +44,13 @@ public class Pedido extends BaseEntity {
 
     @Column(name = "data_vencimento")
     private LocalDate dataVencimento;
+
+    @Column(name = "desconto", precision = 10, scale = 2)
+    private BigDecimal desconto;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_desconto", length = 10)
+    private TipoDesconto tipoDesconto;
 
     @Builder.Default
     @OneToMany(mappedBy = "pedido", cascade =  CascadeType.ALL, orphanRemoval = true)

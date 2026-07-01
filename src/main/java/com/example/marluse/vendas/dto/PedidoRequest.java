@@ -2,9 +2,11 @@ package com.example.marluse.vendas.dto;
 
 import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
+import com.example.marluse.vendas.enums.TipoDesconto;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -22,5 +24,9 @@ public record PedidoRequest(
 
         StatusPedido status,
 
-        LocalDate dataVencimento
+        LocalDate dataVencimento,
+
+        BigDecimal desconto,
+
+        TipoDesconto tipoDesconto
 ) {}
