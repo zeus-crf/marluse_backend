@@ -53,7 +53,9 @@ public class LancamentoFinanceiroService {
             lancamento.setRecorrenciaGrupoId(UUID.randomUUID().toString());
         }
 
-        return LancamentoFinanceiroResponse.from(lancamentoFinanceiroRepository.save(lancamento));
+        LancamentoFinanceiro salvo = lancamentoFinanceiroRepository.save(lancamento);
+
+        return LancamentoFinanceiroResponse.from(salvo);
     }
 
     public List<LancamentoFinanceiroResponse> listarTodos(){
@@ -102,9 +104,33 @@ public class LancamentoFinanceiroService {
 
         lancamento.setStatus(StatusLancamento.PAGO);
         lancamento.setDataPagamento(LocalDate.now());
+        lancamentoFinanceiroRepository.save(lancamento);
 
-        return LancamentoFinanceiroResponse.from(lancamentoFinanceiroRepository.save(lancamento));
+        return LancamentoFinanceiroResponse.from(lancamento);
+    }
 
+    private LancamentoFinanceiro criarProximoLancamento(LancamentoFinanceiro base, LocalDate data) {
+        return LancamentoFinanceiro.builder()
+                .tipo(base.getTipo())
+                .categoria(base.getCategoria())
+                .descricao(base.getDescricao())
+                .valor(base.getValor())
+                .status(StatusLancamento.PENDENTE)
+                .dataVencimento(data)
+                .recorrencia(base.getRecorrencia())
+                .recorrenciaGrupoId(base.getRecorrenciaGrupoId())
+                .recorrenciaAtiva(true)
+                .cliente(base.getCliente())
+                .build();
+    }
+
+    private LocalDate calcularProximaData(LancamentoFinanceiro lancamento) {
+        return switch (lancamento.getRecorrencia()) {
+            case DIARIA  -> lancamento.getDataVencimento().plusDays(1);
+            case SEMANAL -> lancamento.getDataVencimento().plusWeeks(1);
+            case MENSAL  -> lancamento.getDataVencimento().plusMonths(1);
+            case ANUAL   -> lancamento.getDataVencimento().plusYears(1);
+        };
     }
 
 

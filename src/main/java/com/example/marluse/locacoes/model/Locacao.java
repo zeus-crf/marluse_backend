@@ -21,6 +21,9 @@ import java.util.List;
 @Builder
 public class Locacao extends BaseEntity {
 
+    @Column(nullable = false)
+    private Long numero;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id")
     private Cliente cliente;

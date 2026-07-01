@@ -90,6 +90,11 @@ public class PedidoService {
         }
 
         pedido.setValorTotal(total);
+
+        // Gera número sequencial antes de salvar
+        long numeroPedido = pedidoRepository.count() + 1;
+        pedido.setNumero(numeroPedido);
+
         Pedido pedidoSalvo = pedidoRepository.save(pedido);
 
         // Orçamento não gera lançamento financeiro
@@ -102,7 +107,7 @@ public class PedidoService {
                         : LocalDate.now().plusDays(30);
                 lancamentoService.registrarVendaReceita(
                         pedidoSalvo,
-                        "Venda fiado - " + nomeCliente,
+                        String.format("Venda fiado #%03d - %s", numeroPedido, nomeCliente),
                         total,
                         StatusLancamento.PENDENTE,
                         vencimento
@@ -110,7 +115,7 @@ public class PedidoService {
             } else {
                 lancamentoService.registrarVendaReceita(
                         pedidoSalvo,
-                        "Venda - " + nomeCliente,
+                        String.format("Venda #%03d - %s", numeroPedido, nomeCliente),
                         total,
                         StatusLancamento.PAGO,
                         LocalDate.now()

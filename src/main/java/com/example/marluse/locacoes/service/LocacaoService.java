@@ -100,15 +100,21 @@ public class LocacaoService {
         }
 
         locacao.setValorTotal(total);
+
+        // Gera número sequencial antes de salvar
+        long numeroLocacao = locacaoRepository.count() + 1;
+        locacao.setNumero(numeroLocacao);
+
         Locacao locacaoSalva = locacaoRepository.save(locacao);
 
         // Integração financeira — apenas para locações confirmadas (não orçamento)
         if (statusInicial != StatusLocacao.ORCAMENTO) {
             String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+
             if (request.formaPagamento() == FormaPagamento.FIADO) {
                 lancamentoService.registarLocacaoReceita(
                         locacaoSalva,
-                        "Locação fiado - " + nomeCliente,
+                        String.format("Locação fiado #%03d - %s", numeroLocacao, nomeCliente),
                         total,
                         StatusLancamento.PENDENTE,
                         locacaoSalva.getDataDevolucaoPrevista().plusDays(1)
@@ -116,7 +122,7 @@ public class LocacaoService {
             } else {
                 lancamentoService.registarLocacaoReceita(
                         locacaoSalva,
-                        "Locação - " + nomeCliente,
+                        String.format("Locação #%03d - %s", numeroLocacao, nomeCliente),
                         total,
                         StatusLancamento.PAGO,
                         LocalDate.now()
@@ -258,6 +264,7 @@ public class LocacaoService {
                 .toList();
         return new LocacaoResponse(
                 locacao.getId(),
+                locacao.getNumero(),
                 locacao.getCliente() != null ? locacao.getCliente().getId() : null,
                 locacao.getCliente() != null ? locacao.getCliente().getNome() : "Consumidor Final",
                 locacao.getStatus(),

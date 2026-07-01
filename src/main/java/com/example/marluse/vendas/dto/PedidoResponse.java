@@ -11,6 +11,7 @@ import java.util.List;
 
 public record PedidoResponse(
         String id,
+        Long numero,
         String clienteId,
         String clienteNome,
         StatusPedido status,
@@ -24,6 +25,7 @@ public record PedidoResponse(
     public static PedidoResponse from(Pedido pedido) {
         return new PedidoResponse(
                 pedido.getId(),
+                pedido.getNumero(),
                 pedido.getCliente() != null ? pedido.getCliente().getId() : null,
                 pedido.getCliente() != null ? pedido.getCliente().getNome() : "Consumidor Final",
                 statusEfetivo(pedido),
