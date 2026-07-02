@@ -24,9 +24,13 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import com.example.marluse.financeiro.dto.ParcelaResponse;
+import com.example.marluse.financeiro.model.LancamentoFinanceiro;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -103,6 +107,7 @@ public class LocacaoService {
 
         locacao.setDesconto(request.desconto());
         locacao.setTipoDesconto(request.tipoDesconto());
+        if (request.desconto() != null) locacao.setDescontoAplicadoEm(LocalDate.now());
         BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
 
         locacao.setValorTotal(valorFinal);
@@ -119,23 +124,16 @@ public class LocacaoService {
         if (statusInicial != StatusLocacao.ORCAMENTO) {
             String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
 
-            if (request.formaPagamento() == FormaPagamento.FIADO) {
-                lancamentoService.registarLocacaoReceita(
-                        locacaoSalva,
-                        String.format("Locação fiado #%03d - %s", numeroLocacao, nomeCliente),
-                        total,
-                        StatusLancamento.PENDENTE,
-                        locacaoSalva.getDataDevolucaoPrevista().plusDays(1)
-                );
-            } else {
-                lancamentoService.registarLocacaoReceita(
-                        locacaoSalva,
-                        String.format("Locação #%03d - %s", numeroLocacao, nomeCliente),
-                        total,
-                        StatusLancamento.PAGO,
-                        LocalDate.now()
-                );
-            }
+            int parcelas = request.numeroParcelas() != null && request.numeroParcelas() > 1
+                    ? request.numeroParcelas() : 1;
+            // Locações sempre iniciam PENDENTE — o pagamento é confirmado na devolução
+            String descricao = request.formaPagamento() == FormaPagamento.FIADO
+                    ? String.format("Locação fiado #%03d - %s", numeroLocacao, nomeCliente)
+                    : String.format("Locação #%03d - %s", numeroLocacao, nomeCliente);
+            LocalDate vencimento = request.primeiroVencimento() != null ? request.primeiroVencimento()
+                    : locacaoSalva.getDataDevolucaoPrevista().plusDays(1);
+
+            lancamentoService.registarLocacaoReceita(locacaoSalva, descricao, valorFinal, StatusLancamento.PENDENTE, vencimento, parcelas);
         }
 
         return toResponse(locacaoSalva);
@@ -148,16 +146,25 @@ public class LocacaoService {
                 .toList();
     }
 
-    public LocacaoResponse listarPorId(String id){
-        return locacaoRepository.findById(id)
-                .map(LocacaoResponse::from)
+    public LocacaoResponse listarPorId(String id) {
+        Locacao locacao = locacaoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Locação não encontrada"));
+        List<ParcelaResponse> parcelas = listarParcelas(id);
+        return LocacaoResponse.from(locacao, parcelas);
     }
 
     public List<LocacaoResponse> listarPorStatus(StatusLocacao status) {
         return locacaoRepository.findByStatus(status)
                 .stream()
                 .map(LocacaoResponse::from)
+                .toList();
+    }
+
+    public List<ParcelaResponse> listarParcelas(String locacaoId) {
+        return lancamentoRepository.findByLocacaoId(locacaoId).stream()
+                .sorted(Comparator.comparing(LancamentoFinanceiro::getDataVencimento,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(ParcelaResponse::from)
                 .toList();
     }
 
@@ -177,13 +184,32 @@ public class LocacaoService {
             throw new IllegalArgumentException("Não é possível editar uma locação " + locacao.getStatus().name().toLowerCase());
         }
 
-        if (request.desconto() != null ){
+        if (request.desconto() != null) {
             locacao.setDesconto(request.desconto());
             locacao.setTipoDesconto(request.tipoDesconto());
-            BigDecimal bruto = locacao.getItens().stream()
-                    .map(i -> i.getPrecoDiaria().multiply(BigDecimal.valueOf(i.getQuantidade())))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            locacao.setValorTotal(aplicarDesconto(bruto, request.desconto(), request.tipoDesconto()));
+            locacao.setDescontoAplicadoEm(LocalDate.now());
+            // Aplica desconto sobre o valorTotal atual (cumulativo)
+            BigDecimal novoTotal = aplicarDesconto(locacao.getValorTotal(), request.desconto(), request.tipoDesconto());
+            locacao.setValorTotal(novoTotal);
+
+            // Redistribui valor entre parcelas ainda não pagas
+            List<LancamentoFinanceiro> pendentes =
+                    lancamentoRepository.findByLocacaoIdAndStatusNot(id, StatusLancamento.PAGO);
+            if (!pendentes.isEmpty()) {
+                BigDecimal pago = lancamentoRepository.findByLocacaoId(id).stream()
+                        .filter(l -> l.getStatus() == StatusLancamento.PAGO)
+                        .map(LancamentoFinanceiro::getValor)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal restante = novoTotal.subtract(pago);
+                if (restante.compareTo(BigDecimal.ZERO) < 0)
+                    throw new IllegalArgumentException("Desconto resulta em valor menor que o já pago");
+                BigDecimal valorParcela = restante.divide(
+                        BigDecimal.valueOf(pendentes.size()), 2, RoundingMode.HALF_UP);
+                pendentes.forEach(l -> {
+                    l.setValor(valorParcela);
+                    lancamentoRepository.save(l);
+                });
+            }
         }
 
         locacao.setFormaPagamento(request.formaPagamento());
@@ -207,7 +233,7 @@ public class LocacaoService {
             produtoRepository.save(produto);
         }
 
-        lancamentoRepository.findByLocacaoId(id).ifPresent(l -> {
+        lancamentoRepository.findByLocacaoId(id).forEach(l -> {
             if (l.getStatus() != StatusLancamento.PAGO) {
                 l.setStatus(StatusLancamento.PAGO);
                 l.setDataPagamento(LocalDate.now());
@@ -258,7 +284,7 @@ public class LocacaoService {
             }
         }
 
-        lancamentoRepository.findByLocacaoId(id).ifPresent(l -> {
+        lancamentoRepository.findByLocacaoId(id).forEach(l -> {
             l.setStatus(StatusLancamento.CANCELADO);
             lancamentoRepository.save(l);
         });
@@ -276,37 +302,53 @@ public class LocacaoService {
 
         BigDecimal resulto = bruto.subtract(calc);
 
-        if (resulto.compareTo(BigDecimal.ZERO) > 0)
+        if (resulto.compareTo(BigDecimal.ZERO) < 0)
             throw new IllegalArgumentException("Desconto não pode ser maior que o valor total");
+        return resulto;
     }
 
-    private LocacaoResponse toResponse (Locacao locacao){
+    @Transactional
+    public LocacaoResponse confirmar(String id) {
+        Locacao locacao = locacaoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Locação não encontrada"));
 
-        List<ItemLocacaoResponse> itens = locacao.getItens().stream()
-                .map(item -> new ItemLocacaoResponse(
-                        item.getId(),
-                        item.getProduto().getId(),
-                        item.getProduto().getNome(),
-                        item.getQuantidade(),
-                        item.getPrecoDiaria(),
-                        item.getSubtotal()
-                ))
-                .toList();
-        return new LocacaoResponse(
-                locacao.getId(),
-                locacao.getNumero(),
-                locacao.getCliente() != null ? locacao.getCliente().getId() : null,
-                locacao.getCliente() != null ? locacao.getCliente().getNome() : "Consumidor Final",
-                locacao.getStatus(),
-                locacao.getFormaPagamento(),
-                locacao.getDataRetirada(),
-                locacao.getDataDevolucaoPrevista(),
-                locacao.getDataDevolucaoReal(),
-                locacao.getValorTotal(),
-                locacao.getObservacao(),
-                itens,
-                locacao.getCreatedAt(),
+        if (locacao.getStatus() != StatusLocacao.ORCAMENTO) {
+            throw new IllegalArgumentException("Apenas orçamentos podem ser confirmados");
+        }
 
-        );
+        // Reserva estoque
+        for (ItemLocacao item : locacao.getItens()) {
+            Produto produto = item.getProduto();
+            if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
+                throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
+            }
+            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
+            produtoRepository.save(produto);
+        }
+
+        // Cria lançamento PENDENTE (confirmado na devolução)
+        String nomeCliente = locacao.getCliente() != null ? locacao.getCliente().getNome() : "Consumidor Final";
+        String descricao = locacao.getFormaPagamento() == FormaPagamento.FIADO
+                ? String.format("Locação fiado #%03d - %s", locacao.getNumero(), nomeCliente)
+                : String.format("Locação #%03d - %s", locacao.getNumero(), nomeCliente);
+        LocalDate vencimento = locacao.getDataDevolucaoPrevista().plusDays(1);
+
+        lancamentoService.registarLocacaoReceita(locacao, descricao, locacao.getValorTotal(), StatusLancamento.PENDENTE, vencimento, 1);
+
+        // ATIVA ou já ATRASADA se a data prevista passou
+        StatusLocacao novoStatus = locacao.getDataDevolucaoPrevista().isBefore(LocalDate.now())
+                ? StatusLocacao.ATRASADA
+                : StatusLocacao.ATIVA;
+        locacao.setStatus(novoStatus);
+
+        return LocacaoResponse.from(locacaoRepository.save(locacao));
+    }
+
+    public BigDecimal somarLocacoesPorPeriodo(LocalDate inicio, LocalDate fim) {
+        return lancamentoRepository.somarReceitaLocacoesPorPagamento(inicio, fim);
+    }
+
+    private LocacaoResponse toResponse(Locacao locacao) {
+        return LocacaoResponse.from(locacao);
     }
 }

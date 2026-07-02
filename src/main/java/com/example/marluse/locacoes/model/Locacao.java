@@ -58,6 +58,9 @@ public class Locacao extends BaseEntity {
     @Column(name = "tipo_desconto", length = 10)
     private TipoDesconto tipoDesconto;
 
+    @Column(name = "desconto_aplicado_em")
+    private LocalDate descontoAplicadoEm;
+
     @Builder.Default
     @OneToMany(mappedBy = "locacao", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ItemLocacao> itens = new ArrayList<>();

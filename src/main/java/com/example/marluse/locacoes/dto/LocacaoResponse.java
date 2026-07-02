@@ -1,5 +1,6 @@
 package com.example.marluse.locacoes.dto;
 
+import com.example.marluse.financeiro.dto.ParcelaResponse;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.vendas.enums.FormaPagamento;
@@ -26,11 +27,17 @@ public record LocacaoResponse(
         LocalDateTime createdAt,
         BigDecimal valorBruto,
         BigDecimal desconto,
-        TipoDesconto tipoDesconto
+        TipoDesconto tipoDesconto,
+        LocalDate descontoAplicadoEm,
+        List<ParcelaResponse> parcelas
 ) {
     public static LocacaoResponse from(Locacao locacao) {
+        return from(locacao, null);
+    }
+
+    public static LocacaoResponse from(Locacao locacao, List<ParcelaResponse> parcelas) {
         BigDecimal bruto = locacao.getItens().stream()
-                .map(i -> i.getPrecoDiaria().multiply(BigDecimal.valueOf(i.getQuantidade())))
+                .map(i -> i.getSubtotal())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new LocacaoResponse(
@@ -49,7 +56,9 @@ public record LocacaoResponse(
                 locacao.getCreatedAt(),
                 bruto,
                 locacao.getDesconto(),
-                locacao.getTipoDesconto()
+                locacao.getTipoDesconto(),
+                locacao.getDescontoAplicadoEm(),
+                parcelas
         );
     }
 }

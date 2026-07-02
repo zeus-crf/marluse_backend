@@ -1,6 +1,5 @@
 package com.example.marluse.financeiro.repository;
 
-import com.example.marluse.financeiro.dto.LancamentoFinanceiroResponse;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.enums.TipoLancamento;
 import com.example.marluse.financeiro.model.LancamentoFinanceiro;
@@ -12,15 +11,18 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 public interface LancamentoFinanceiroRepository extends JpaRepository<LancamentoFinanceiro, String> {
 
     List<LancamentoFinanceiro> findByStatus(StatusLancamento status);
 
-    Optional<LancamentoFinanceiro> findByPedidoId(String pedidoId);
+    List<LancamentoFinanceiro> findByPedidoId(String pedidoId);
 
-    Optional<LancamentoFinanceiro> findByLocacaoId(String locacaoId);
+    List<LancamentoFinanceiro> findByLocacaoId(String locacaoId);
+
+    List<LancamentoFinanceiro> findByPedidoIdAndStatusNot(String pedidoId, StatusLancamento status);
+
+    List<LancamentoFinanceiro> findByLocacaoIdAndStatusNot(String locacaoId, StatusLancamento status);
 
     void deleteByLocacaoId(String locacaoId);
 
@@ -34,6 +36,13 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarReceitaPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    /** Soma somente lançamentos de vendas (pedido IS NOT NULL) pagos no período — usa dataPagamento */
+    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l " +
+           "WHERE l.pedido IS NOT NULL AND l.status = 'PAGO' " +
+           "AND l.dataPagamento BETWEEN :inicio AND :fim")
+    BigDecimal somarReceitaVendasPorPagamento(@Param("inicio") LocalDate inicio,
+                                              @Param("fim") LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'DESPESA' AND l.status = 'PAGO' AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarDespesaPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
@@ -71,5 +80,33 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
     List<Object[]> topClientesPorReceita(@Param("inicio") LocalDate inicio,
                                          @Param("fim") LocalDate fim,
                                          Pageable pageable);
+
+    @Query("SELECT l FROM LancamentoFinanceiro l " +
+            "WHERE l.pedido IS NOT NULL " +
+            "AND l.totalParcelas > 1 " +
+            "AND l.status = 'PENDENTE' " +
+            "ORDER BY l.dataVencimento ASC NULLS LAST")
+    List<LancamentoFinanceiro> findProximasParcelasPendentes();
+
+    @Query("""
+        SELECT l FROM LancamentoFinanceiro l
+        WHERE l.pedido IS NOT NULL
+        AND l.totalParcelas > 1
+        AND l.status = 'PAGO'
+        AND NOT EXISTS (
+            SELECT 1 FROM LancamentoFinanceiro l2
+            WHERE l2.pedido = l.pedido
+            AND l2.status = 'PENDENTE'
+        )
+        ORDER BY l.numParcelas DESC NULLS LAST
+    """)
+    List<LancamentoFinanceiro> findUltimasParcelasDePedidosPagos();
+
+    /** Soma somente lançamentos de locações (locacao IS NOT NULL) pagos no período — usa dataPagamento */
+    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l " +
+           "WHERE l.locacao IS NOT NULL AND l.status = 'PAGO' " +
+           "AND l.dataPagamento BETWEEN :inicio AND :fim")
+    BigDecimal somarReceitaLocacoesPorPagamento(@Param("inicio") LocalDate inicio,
+                                                @Param("fim") LocalDate fim);
 
 }

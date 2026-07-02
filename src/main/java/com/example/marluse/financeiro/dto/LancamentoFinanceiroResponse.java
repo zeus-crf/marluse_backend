@@ -23,6 +23,8 @@ public record LancamentoFinanceiroResponse(
         String recorrenciaGrupoId,
         boolean recorrenciaAtiva,
         String clienteNome,
+        Integer numParcelas,
+        Integer totalParcelas,
         String pedidoId,
         String locacaoId,
         LocalDateTime createdAt
@@ -42,6 +44,8 @@ public record LancamentoFinanceiroResponse(
                 l.getRecorrenciaGrupoId(),
                 Boolean.TRUE.equals(l.getRecorrenciaAtiva()),
                 l.getCliente() != null ? l.getCliente().getNome() : null,
+                l.getNumParcelas(),
+                l.getTotalParcelas(),
                 l.getPedido() != null ? l.getPedido().getId() : null,
                 l.getLocacao() != null ? l.getLocacao().getId() : null,
                 l.getCreatedAt()

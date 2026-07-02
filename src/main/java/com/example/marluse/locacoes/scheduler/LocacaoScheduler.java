@@ -4,6 +4,8 @@ import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,13 @@ import java.time.LocalDate;
 public class LocacaoScheduler {
 
     private final LocacaoRepository locacaoRepository;
+
+    /** Roda na inicialização para já corrigir locações vencidas sem esperar a meia-noite. */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void marcarAtrasadasNaInicializacao() {
+        marcarLocacoesAtrasadas();
+    }
 
     /**
      * Executa todo dia à meia-noite.

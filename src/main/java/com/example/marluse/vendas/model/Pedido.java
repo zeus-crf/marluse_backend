@@ -52,6 +52,9 @@ public class Pedido extends BaseEntity {
     @Column(name = "tipo_desconto", length = 10)
     private TipoDesconto tipoDesconto;
 
+    @Column(name = "desconto_aplicado_em")
+    private LocalDate descontoAplicadoEm;
+
     @Builder.Default
     @OneToMany(mappedBy = "pedido", cascade =  CascadeType.ALL, orphanRemoval = true)
     private List<ItemPedido> itens = new ArrayList<>();

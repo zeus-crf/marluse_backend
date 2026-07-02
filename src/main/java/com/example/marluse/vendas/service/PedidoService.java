@@ -5,6 +5,7 @@ import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.model.LancamentoFinanceiro;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.financeiro.service.LancamentoFinanceiroService;
 import com.example.marluse.vendas.dto.ItemPedidoRequest;
@@ -23,9 +24,17 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import com.example.marluse.financeiro.dto.ParcelaResponse;
+
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -47,7 +56,20 @@ public class PedidoService {
         }
 
 
-        StatusPedido statusInicial = (request.status() != null) ? request.status() : StatusPedido.CONFIRMADO;
+        // Calcula forma de pagamento antes de definir o status inicial
+        int numParcelas = request.numeroParcelas() != null && request.numeroParcelas() > 1
+                ? request.numeroParcelas() : 1;
+        boolean isPendente = request.formaPagamento() == FormaPagamento.FIADO || numParcelas > 1;
+        StatusLancamento statusLanc = isPendente ? StatusLancamento.PENDENTE : StatusLancamento.PAGO;
+
+        StatusPedido statusInicial;
+        if (request.status() != null) {
+            statusInicial = request.status();
+        } else if (!isPendente) {
+            statusInicial = StatusPedido.PAGO;       // pagamento à vista → já pago
+        } else {
+            statusInicial = StatusPedido.CONFIRMADO; // parcelado / fiado → aguardando
+        }
 
         Pedido pedido = Pedido.builder()
                 .status(statusInicial)
@@ -93,6 +115,7 @@ public class PedidoService {
 
         pedido.setDesconto(request.desconto());
         pedido.setTipoDesconto(request.tipoDesconto());
+        if (request.desconto() != null) pedido.setDescontoAplicadoEm(LocalDate.now());
         BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
         pedido.setValorTotal(valorFinal);
 
@@ -106,43 +129,63 @@ public class PedidoService {
         // Orçamento não gera lançamento financeiro
         if (statusInicial != StatusPedido.ORCAMENTO) {
             String nomeCliente = cliente != null ? cliente.getNome() : "Consumidor Final";
+            String descricao = String.format("Pedido #%03d - %s", numeroPedido, nomeCliente);
 
-            if (request.formaPagamento() == FormaPagamento.FIADO) {
-                LocalDate vencimento = request.dataVencimento() != null
-                        ? request.dataVencimento()
-                        : LocalDate.now().plusDays(30);
-                lancamentoService.registrarVendaReceita(
-                        pedidoSalvo,
-                        String.format("Venda fiado #%03d - %s", numeroPedido, nomeCliente),
-                        total,
-                        StatusLancamento.PENDENTE,
-                        vencimento
-                );
-            } else {
-                lancamentoService.registrarVendaReceita(
-                        pedidoSalvo,
-                        String.format("Venda #%03d - %s", numeroPedido, nomeCliente),
-                        total,
-                        StatusLancamento.PAGO,
-                        LocalDate.now()
-                );
-            }
+            LocalDate vencimento = request.primeiroVencimento() != null ? request.primeiroVencimento()
+                    : request.dataVencimento() != null ? request.dataVencimento()
+                    : isPendente ? LocalDate.now().plusDays(30) : LocalDate.now();
+
+            lancamentoService.registrarVendaReceita(pedidoSalvo, descricao, valorFinal, statusLanc, vencimento, numParcelas);
         }
 
-        return toResponse(pedidoSalvo);
+        // Popula a próxima parcela pendente na resposta para reatividade do frontend
+        ParcelaResponse parcelaMesAtual = null;
+        if (numParcelas > 1) {
+            parcelaMesAtual = lancamentoRepository.findByPedidoId(pedidoSalvo.getId()).stream()
+                    .filter(l -> l.getStatus() == StatusLancamento.PENDENTE)
+                    .min(Comparator.comparing(LancamentoFinanceiro::getDataVencimento,
+                            Comparator.nullsLast(Comparator.naturalOrder())))
+                    .map(ParcelaResponse::from)
+                    .orElse(null);
+        }
+        return PedidoResponse.from(pedidoSalvo, null, parcelaMesAtual);
     }
 
-    public List<PedidoResponse> listar(){
-        return pedidoRepository.findAll()
-                .stream()
-                .map(PedidoResponse::from)
+    public List<PedidoResponse> listar() {
+        // Próxima parcela PENDENTE de cada pedido parcelado (ainda em aberto)
+        Map<String, ParcelaResponse> proximaPendentePorPedido =
+                lancamentoRepository.findProximasParcelasPendentes().stream()
+                        .filter(l -> l.getPedido() != null)
+                        .collect(Collectors.toMap(
+                                l -> l.getPedido().getId(),
+                                ParcelaResponse::from,
+                                (a, b) -> a   // ordenado ASC → mantém a mais próxima
+                        ));
+
+        // Última parcela PAGO de pedidos parcelados totalmente quitados
+        Map<String, ParcelaResponse> ultimaPagaPorPedido =
+                lancamentoRepository.findUltimasParcelasDePedidosPagos().stream()
+                        .filter(l -> l.getPedido() != null)
+                        .collect(Collectors.toMap(
+                                l -> l.getPedido().getId(),
+                                ParcelaResponse::from,
+                                (a, b) -> a   // ordenado DESC → mantém a última (maior numParcelas)
+                        ));
+
+        // Mescla: PENDENTE tem prioridade sobre PAGO
+        Map<String, ParcelaResponse> parcelaPorPedido = new HashMap<>(ultimaPagaPorPedido);
+        parcelaPorPedido.putAll(proximaPendentePorPedido);
+
+        return pedidoRepository.findAll().stream()
+                .map(p -> PedidoResponse.from(p, null, parcelaPorPedido.get(p.getId())))
                 .toList();
     }
 
     public PedidoResponse buscarPorId(String id){
-        return pedidoRepository.findById(id)
-                .map(PedidoResponse::from)
+        Pedido pedido = pedidoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Pedido não encontrado"));
+        List<ParcelaResponse> parcelas = listarParcelas(id);
+        return PedidoResponse.from(pedido, parcelas);
     }
 
 
@@ -166,15 +209,28 @@ public class PedidoService {
             throw new IllegalArgumentException("Pedido cancelado não pode ser pago");
         }
 
-        // Só atualiza o lançamento para FIADO (que foi criado como PENDENTE)
-        if (pedido.getFormaPagamento() == FormaPagamento.FIADO) {
-            lancamentoRepository.findByPedidoId(id)
-                    .ifPresent(l -> lancamentoService.pagar(l.getId()));
-        }
+        // Paga lancamentos ainda pendentes (ex.: FIADO, ou ação direta de pagar pedido)
+        lancamentoRepository.findByPedidoId(id).stream()
+                .filter(l -> l.getStatus() != StatusLancamento.PAGO)
+                .forEach(l -> lancamentoService.pagar(l.getId()));
 
         pedido.setStatus(StatusPedido.PAGO);
         pedidoRepository.save(pedido);
-        return toResponse(pedido);
+
+        // Retorna última parcela PAGO para pedidos parcelados (para exibir "N/N pagas" no frontend)
+        List<LancamentoFinanceiro> lancamentos = lancamentoRepository.findByPedidoId(id);
+        boolean ehParcelado = lancamentos.stream()
+                .anyMatch(l -> l.getTotalParcelas() != null && l.getTotalParcelas() > 1);
+        ParcelaResponse parcelaMesAtual = null;
+        if (ehParcelado) {
+            parcelaMesAtual = lancamentos.stream()
+                    .filter(l -> l.getStatus() == StatusLancamento.PAGO)
+                    .max(Comparator.comparing(LancamentoFinanceiro::getNumParcelas,
+                            Comparator.nullsFirst(Comparator.naturalOrder())))
+                    .map(ParcelaResponse::from)
+                    .orElse(null);
+        }
+        return PedidoResponse.from(pedido, null, parcelaMesAtual);
     }
 
     @Transactional
@@ -186,13 +242,16 @@ public class PedidoService {
         }
 
 
-        for (ItemPedido item : pedido.getItens()) {
-            Produto produto = item.getProduto();
-            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
-            produtoRepository.save(produto);
+        // Orçamento nunca reservou estoque, então não restaura
+        if (pedido.getStatus() != StatusPedido.ORCAMENTO) {
+            for (ItemPedido item : pedido.getItens()) {
+                Produto produto = item.getProduto();
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                produtoRepository.save(produto);
+            }
         }
 
-        lancamentoRepository.findByPedidoId(id).ifPresent(l -> {
+        lancamentoRepository.findByPedidoId(id).forEach(l -> {
             l.setStatus(StatusLancamento.CANCELADO);
             lancamentoRepository.save(l);
         });
@@ -214,17 +273,43 @@ public class PedidoService {
         if (request.desconto() != null ) {
             pedido.setDesconto(request.desconto());
             pedido.setTipoDesconto(request.tipoDesconto());
-            BigDecimal bruto = pedido.getItens().stream()
-                    .map(i -> i.getPrecoUnitario().multiply(BigDecimal.valueOf(i.getQuantidade())))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            pedido.setValorTotal(aplicarDesconto(bruto, request.desconto(), request.tipoDesconto()));
+            pedido.setDescontoAplicadoEm(LocalDate.now());
+            // Aplica desconto sobre o valorTotal atual (cumulativo)
+            pedido.setValorTotal(aplicarDesconto(pedido.getValorTotal(), request.desconto(), request.tipoDesconto()));
+        }
 
+        List<LancamentoFinanceiro> pendentes = lancamentoRepository
+                .findByPedidoIdAndStatusNot(id, StatusLancamento.PAGO);
+        if (!pendentes.isEmpty()) {
+            BigDecimal pago = lancamentoRepository.findByPedidoId(id).stream()
+                    .filter(l -> l.getStatus() == StatusLancamento.PAGO)
+                    .map(LancamentoFinanceiro::getValor)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal restante = pedido.getValorTotal().subtract(pago);
+            if (restante.compareTo(BigDecimal.ZERO) < 0)
+                throw new IllegalArgumentException("Desconto resulta em valor menor que o já pago");
+            BigDecimal valorParcela = restante.divide(
+                    BigDecimal.valueOf(pendentes.size()), 2, RoundingMode.HALF_UP);
+            pendentes.forEach(l -> {
+                l.setValor(valorParcela);
+                lancamentoRepository.save(l);
+            });
         }
         return toResponse(pedidoRepository.save(pedido));
     }
 
+    public List<ParcelaResponse> listarParcelas(String pedidoId) {
+        return lancamentoRepository.findByPedidoId(pedidoId).stream()
+                .sorted(Comparator.comparing(LancamentoFinanceiro::getDataVencimento,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(ParcelaResponse::from)
+                .toList();
+    }
+
     public BigDecimal somarVendasPorPeriodo(LocalDate inicio, LocalDate fim){
-        return pedidoRepository.somarVendasPorPeriodo(inicio, fim);
+        // Usa dataPagamento dos lançamentos para refletir quando o dinheiro entrou,
+        // não a data de criação do pedido (correto para pedidos parcelados)
+        return lancamentoRepository.somarReceitaVendasPorPagamento(inicio, fim);
     }
 
     private BigDecimal aplicarDesconto(BigDecimal bruto, BigDecimal desconto, TipoDesconto tipo) {
@@ -243,9 +328,42 @@ public class PedidoService {
 
 
     @Transactional
+    public PedidoResponse confirmar(String id) {
+        Pedido pedido = buscarEntidade(id);
+
+        if (pedido.getStatus() != StatusPedido.ORCAMENTO) {
+            throw new IllegalArgumentException("Apenas orçamentos podem ser confirmados");
+        }
+
+        // Baixa estoque
+        for (ItemPedido item : pedido.getItens()) {
+            Produto produto = item.getProduto();
+            if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
+                throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
+            }
+            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
+            produtoRepository.save(produto);
+        }
+
+        // Gera lançamento financeiro
+        int numParcelas = 1;
+        boolean isPendente = pedido.getFormaPagamento() == FormaPagamento.FIADO;
+        StatusLancamento statusLanc = isPendente ? StatusLancamento.PENDENTE : StatusLancamento.PAGO;
+
+        String nomeCliente = pedido.getCliente() != null ? pedido.getCliente().getNome() : "Consumidor Final";
+        String descricao = String.format("Pedido #%03d - %s", pedido.getNumero(), nomeCliente);
+        LocalDate vencimento = pedido.getDataVencimento() != null ? pedido.getDataVencimento() : LocalDate.now();
+
+        lancamentoService.registrarVendaReceita(pedido, descricao, pedido.getValorTotal(), statusLanc, vencimento, numParcelas);
+
+        pedido.setStatus(isPendente ? StatusPedido.CONFIRMADO : StatusPedido.PAGO);
+        return toResponse(pedidoRepository.save(pedido));
+    }
+
+    @Transactional
     public void excluir(String id) {
         Pedido pedido = buscarEntidade(id);
-        lancamentoRepository.findByPedidoId(id).ifPresent(lancamentoRepository::delete);
+        lancamentoRepository.deleteAll(lancamentoRepository.findByPedidoId(id));
         pedidoRepository.delete(pedido);
     }
 

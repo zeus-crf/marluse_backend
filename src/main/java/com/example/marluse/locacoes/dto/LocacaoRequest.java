@@ -32,7 +32,11 @@ public record LocacaoRequest(
 
         BigDecimal desconto,
 
-        TipoDesconto tipoDesconto
+        TipoDesconto tipoDesconto,
+
+        Integer numeroParcelas,
+
+        LocalDate primeiroVencimento
 
 ) {
 }
