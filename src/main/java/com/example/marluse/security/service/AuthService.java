@@ -34,7 +34,7 @@ public class AuthService {
         Usuario usuario = (Usuario) userDetailsService.loadUserByUsername(request.email());
 
         return AuthResponse.builder()
-                .token(jwtService.generateToken(usuario))
+                .token(jwtService.generateAccessToken(usuario))
                 .email(usuario.getEmail())
                 .nome(usuario.getNome())
                 .build();
@@ -56,7 +56,7 @@ public class AuthService {
         usuarioRepository.save(usuario);
 
         return AuthResponse.builder()
-                .token(jwtService.generateToken(usuario))
+                .token(jwtService.generateAccessToken(usuario))
                 .email(usuario.getEmail())
                 .nome(usuario.getNome())
                 .build();
