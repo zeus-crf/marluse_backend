@@ -95,6 +95,7 @@ public class PedidoService {
                 if (produto.getQuantidadeEstoque() < itemRequest.quantidade()) {
                     throw new IllegalArgumentException("Estoque insuficiente: " + produto.getNome());
                 }
+
                 produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
                 produtoRepository.save(produto);
             }
@@ -105,6 +106,7 @@ public class PedidoService {
                     .pedido(pedido)
                     .produto(produto)
                     .quantidade(itemRequest.quantidade())
+                    .custoUnitario(produto.getValorCompra())
                     .precoUnitario(produto.getPreco())
                     .subTotal(subTotal)
                     .build();
@@ -342,6 +344,7 @@ public class PedidoService {
                 throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
             }
             produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
+            produto.setValorCompra(item.getPrecoUnitario());
             produtoRepository.save(produto);
         }
 

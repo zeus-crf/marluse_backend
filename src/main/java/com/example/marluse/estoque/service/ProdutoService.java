@@ -27,6 +27,7 @@ public class ProdutoService {
                 .nome(request.nome())
                 .descricao(request.descricao())
                 .preco(request.preco())
+                .valorCompra(request.valorCompra())
                 .quantidadeEstoque(request.quantidadeEstoque() != null ? request.quantidadeEstoque() : 0)
                 .estoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0)
                 .ativo(true)
