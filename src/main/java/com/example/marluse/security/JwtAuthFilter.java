@@ -12,7 +12,6 @@ import jakarta.servlet.*;
     import com.example.marluse.security.service.JwtService;
 
     import java.io.IOException;
-    import java.lang.reflect.Array;
     import java.util.Arrays;
     @Component
     @RequiredArgsConstructor
@@ -50,7 +49,7 @@ import jakarta.servlet.*;
                     }
                 }
             } catch (Exception e) {
-                throw new IllegalArgumentException(e.getMessage());
+                // Token inválido ou expirado — continua sem autenticar; Spring retorna 401
             }
             chain.doFilter(request,response);
         }

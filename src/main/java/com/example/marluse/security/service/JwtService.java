@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,7 @@ public class JwtService {
                 .compact();
     }
 
+    @Transactional
     public String generateRefreshToken(Usuario usuario) {
 
         List<RefreshToken> listRefresh = refreshTokenRepository.findAllByUsuario(usuario);
