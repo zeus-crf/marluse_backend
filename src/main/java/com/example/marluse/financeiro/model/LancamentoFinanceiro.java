@@ -68,6 +68,11 @@ public class LancamentoFinanceiro extends BaseEntity {
     @JoinColumn(name = "locacao_id")
     private Locacao locacao;
 
+    @Column(name = "num_parcelas")
+    private Integer numParcelas;
+
+    @Column(name = "total_parcelas")
+    private Integer totalParcelas;
 
 
 }

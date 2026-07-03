@@ -4,6 +4,7 @@ import com.example.marluse.clientes.dto.ClienteResponse;
 import com.example.marluse.clientes.service.ClienteService;
 import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.service.ProdutoService;
+import com.example.marluse.financeiro.dto.ParcelaResponse;
 import com.example.marluse.shared.ApiResponse;
 import com.example.marluse.vendas.dto.PedidoAtualizarRequest;
 import com.example.marluse.vendas.dto.PedidoRequest;
@@ -21,7 +22,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Date;
 import java.util.List;
 
 @RestController
@@ -86,6 +86,16 @@ public class PedidoController {
     @PatchMapping("/{id}/cancelar")
     public ResponseEntity<ApiResponse<PedidoResponse>> cancelar(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.ok("Pedido cancelado", pedidoService.cancelar(id)));
+    }
+
+    @PatchMapping("/{id}/confirmar")
+    public ResponseEntity<ApiResponse<PedidoResponse>> confirmar(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok("Orçamento confirmado como venda", pedidoService.confirmar(id)));
+    }
+
+    @GetMapping("/{id}/parcelas")
+    public ResponseEntity<ApiResponse<List<ParcelaResponse>>> listarParcelas(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok(pedidoService.listarParcelas(id)));
     }
 
     @DeleteMapping("/{id}")

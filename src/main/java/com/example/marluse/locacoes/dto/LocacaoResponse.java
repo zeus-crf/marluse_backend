@@ -1,8 +1,10 @@
 package com.example.marluse.locacoes.dto;
 
+import com.example.marluse.financeiro.dto.ParcelaResponse;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.vendas.enums.FormaPagamento;
+import com.example.marluse.vendas.enums.TipoDesconto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,9 +24,22 @@ public record LocacaoResponse(
         BigDecimal valorTotal,
         String observacao,
         List<ItemLocacaoResponse> itens,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        BigDecimal valorBruto,
+        BigDecimal desconto,
+        TipoDesconto tipoDesconto,
+        LocalDate descontoAplicadoEm,
+        List<ParcelaResponse> parcelas
 ) {
     public static LocacaoResponse from(Locacao locacao) {
+        return from(locacao, null);
+    }
+
+    public static LocacaoResponse from(Locacao locacao, List<ParcelaResponse> parcelas) {
+        BigDecimal bruto = locacao.getItens().stream()
+                .map(i -> i.getSubtotal())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         return new LocacaoResponse(
                 locacao.getId(),
                 locacao.getNumero(),
@@ -38,7 +53,12 @@ public record LocacaoResponse(
                 locacao.getValorTotal(),
                 locacao.getObservacao(),
                 locacao.getItens().stream().map(ItemLocacaoResponse::from).toList(),
-                locacao.getCreatedAt()
+                locacao.getCreatedAt(),
+                bruto,
+                locacao.getDesconto(),
+                locacao.getTipoDesconto(),
+                locacao.getDescontoAplicadoEm(),
+                parcelas
         );
     }
 }

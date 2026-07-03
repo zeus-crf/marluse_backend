@@ -40,6 +40,7 @@ public class GlobalExceptionHandler {
                         .success(false).message("Erro de validação").data(errors).build());
     }
 
+    @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex){
         log.error("Error não tratado: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

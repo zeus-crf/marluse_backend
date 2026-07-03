@@ -58,7 +58,7 @@ public class ProdutoService {
         if (request.descricao() != null) produto.setDescricao(request.descricao());
         if (request.preco() != null) produto.setPreco(request.preco());
         if (request.medida() != null) produto.setMedida(request.medida());
-        produto.setQuantidadeEstoque(request.quantidadeEstoque());
+        if (request.quantidadeEstoque() != null) produto.setQuantidadeEstoque(request.quantidadeEstoque());
         produto.setEstoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0);
 
         return ProdutoResponse.from(produtoRepository.save(produto));

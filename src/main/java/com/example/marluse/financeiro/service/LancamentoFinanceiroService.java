@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -163,43 +164,84 @@ public class LancamentoFinanceiroService {
 
     @Transactional
     public void deletar(String id) {
+        LancamentoFinanceiro lancamento = buscarEntidade(id);
 
-        lancamentoFinanceiroRepository.deleteById(id);
+        // Lançamentos gerados pelo sistema (vinculados a pedido ou locação) não podem ser
+        // deletados diretamente — use cancelar/devolver no pedido/locação pai.
+        if (lancamento.getPedido() != null) {
+            throw new IllegalArgumentException(
+                    "Lançamentos vinculados a uma venda não podem ser excluídos diretamente. Cancele a venda.");
+        }
+        if (lancamento.getLocacao() != null) {
+            throw new IllegalArgumentException(
+                    "Lançamentos vinculados a uma locação não podem ser excluídos diretamente. Cancele a locação.");
+        }
+
+        lancamentoFinanceiroRepository.delete(lancamento);
     }
 
 
     public void registrarVendaReceita(Pedido pedido, String descricao, BigDecimal valor,
-                                      StatusLancamento status, LocalDate dataVencimento) {
-        LancamentoFinanceiro lancamento = LancamentoFinanceiro.builder()
-                .tipo(TipoLancamento.RECEITA)
-                .categoria("Venda")
-                .descricao(descricao)
-                .valor(valor)
-                .status(status)
-                .dataVencimento(dataVencimento)
-                .dataPagamento(status == StatusLancamento.PAGO ? LocalDate.now() : null)
-                .cliente(pedido.getCliente())
-                .pedido(pedido)
-                .build();
+                                      StatusLancamento status, LocalDate dataVencimento,
+                                      int numeroParcelas) {
 
-        lancamentoFinanceiroRepository.save(lancamento);
+        BigDecimal valorParcela = valor.divide(BigDecimal.valueOf(numeroParcelas), 2, RoundingMode.HALF_UP);
+
+        for (int i = 1 ; i <= numeroParcelas; i++) {
+            LocalDate vencimento = dataVencimento.plusMonths(i - 1);
+            String desc = numeroParcelas > 1
+                    ? String.format("%s (%d/%d)", descricao, i, numeroParcelas)
+                    : descricao;
+
+
+            LancamentoFinanceiro l = LancamentoFinanceiro.builder()
+                    .tipo(TipoLancamento.RECEITA)
+                    .categoria("Venda")
+                    .descricao(desc)
+                    .valor(valorParcela)
+                    .status(status)
+                    .dataVencimento(vencimento)
+                    .dataPagamento(status == StatusLancamento.PAGO ? LocalDate.now() : null)
+                    .cliente(pedido.getCliente())
+                    .pedido(pedido)
+                    .numParcelas(i)
+                    .totalParcelas(numeroParcelas)
+                    .build();
+
+            lancamentoFinanceiroRepository.save(l);
+        }
+
     }
 
     public void registarLocacaoReceita(Locacao locacao, String descricao, BigDecimal valor,
-                                       StatusLancamento status, LocalDate dataVencimento) {
-        LancamentoFinanceiro lancamento = LancamentoFinanceiro.builder()
-                .tipo(TipoLancamento.RECEITA)
-                .categoria("Locação")
-                .descricao(descricao)
-                .valor(valor)
-                .status(status)
-                .dataVencimento(dataVencimento)
-                .dataPagamento(status == StatusLancamento.PAGO ? LocalDate.now() : null)
-                .cliente(locacao.getCliente())
-                .locacao(locacao)
-                .build();
+                                       StatusLancamento status, LocalDate dataVencimento, int numeroParcelas) {
 
-        lancamentoFinanceiroRepository.save(lancamento);
+        BigDecimal valorParcela = valor.divide(BigDecimal.valueOf(numeroParcelas), 2, RoundingMode.HALF_UP);
+
+        for (int i = 1; i <= numeroParcelas; i ++ ) {
+            LocalDate vencimento = dataVencimento.plusMonths( i - 1);
+            String desc = numeroParcelas > 1
+                    ? String.format("%s (%d/%d)", descricao, i, numeroParcelas)
+                    : descricao;
+
+
+            LancamentoFinanceiro lancamento = LancamentoFinanceiro.builder()
+                    .tipo(TipoLancamento.RECEITA)
+                    .categoria("Locação")
+                    .descricao(desc)
+                    .valor(valorParcela)
+                    .status(status)
+                    .dataVencimento(vencimento)
+                    .dataPagamento(status == StatusLancamento.PAGO ? LocalDate.now() : null)
+                    .cliente(locacao.getCliente())
+                    .locacao(locacao)
+                    .numParcelas(i)
+                    .totalParcelas(numeroParcelas)
+                    .build();
+
+            lancamentoFinanceiroRepository.save(lancamento);
+        }
+
     }
 
 
