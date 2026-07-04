@@ -57,6 +57,7 @@ public class ProdutoService {
 
         if (request.nome() != null) produto.setNome(request.nome());
         if (request.descricao() != null) produto.setDescricao(request.descricao());
+        if (request.valorCompra() != null) produto.setValorCompra(request.valorCompra());
         if (request.preco() != null) produto.setPreco(request.preco());
         if (request.medida() != null) produto.setMedida(request.medida());
         if (request.quantidadeEstoque() != null) produto.setQuantidadeEstoque(request.quantidadeEstoque());

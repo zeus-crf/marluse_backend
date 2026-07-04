@@ -146,10 +146,18 @@ public class RelatoriosService {
         LocalDateTime fim = LocalDate.now().atTime(23, 59, 59);
         List<Object[]> rows = itemPedidoRepository.topProdutos(ini, fim, PageRequest.of(0, limite));
         return rows.stream()
-                .map(r -> new TopProdutoResponse(
-                        (String) r[0],
-                        ((Number) r[1]).longValue(),
-                        (BigDecimal) r[2]))
+                .map(r -> {
+                    BigDecimal total = (BigDecimal) r[2];
+                    BigDecimal custo = (BigDecimal) r[3];
+                    BigDecimal lucro = total.subtract(custo);
+                    return new TopProdutoResponse(
+                            (String) r[0],
+                            ((Number) r[1]).longValue(),
+                            lucro,   // r[2] - r[3]
+                            custo,
+                            total    // r[2]
+                    );
+                })
                 .toList();
     }
 

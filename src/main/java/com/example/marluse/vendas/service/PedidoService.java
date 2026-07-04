@@ -337,15 +337,17 @@ public class PedidoService {
             throw new IllegalArgumentException("Apenas orçamentos podem ser confirmados");
         }
 
-        // Baixa estoque
+        // Baixa estoque e faz snapshot do custo no item
         for (ItemPedido item : pedido.getItens()) {
             Produto produto = item.getProduto();
             if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
                 throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
             }
             produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
-            produto.setValorCompra(item.getPrecoUnitario());
             produtoRepository.save(produto);
+
+            // Registra o custo de compra vigente no momento da confirmação
+            item.setCustoUnitario(produto.getValorCompra());
         }
 
         // Gera lançamento financeiro
