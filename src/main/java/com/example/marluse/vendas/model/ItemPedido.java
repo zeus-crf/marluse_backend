@@ -33,6 +33,7 @@ public class ItemPedido extends BaseEntity {
     @Column(name = "custo_unitario",  precision = 10, scale = 2)
     private BigDecimal custoUnitario;
 
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subTotal;
 }

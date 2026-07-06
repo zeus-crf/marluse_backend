@@ -11,5 +11,7 @@ public record KpisResponse(
         Double variacaoReceita,
         Double variacaoDespesas,
         Double variacaoSaldo,
-        Double variacaoTicketMedio
+        Double variacaoTicketMedio,
+        BigDecimal cmv,
+        BigDecimal lucroLiquido
 ) {}
