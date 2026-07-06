@@ -55,6 +55,15 @@ public class LocacaoService {
             throw new IllegalArgumentException("A data de devolução deve ser posterior à data de retirada");
         }
 
+        // Fiado e parcelado exigem cliente cadastrado — não faz sentido registrar dívida sem devedor
+        int numParcelas = request.numeroParcelas() != null && request.numeroParcelas() > 1
+                ? request.numeroParcelas() : 1;
+        boolean isPendente = request.formaPagamento() == FormaPagamento.FIADO || numParcelas > 1;
+        if (isPendente && cliente == null) {
+            throw new IllegalArgumentException(
+                    "Pagamento fiado ou parcelado exige um cliente cadastrado");
+        }
+
         // Status inicial: query param tem prioridade; fallback para campo do body ou ATIVA
         StatusLocacao statusInicial = isOrcamento ? StatusLocacao.ORCAMENTO
                 : (request.status() != null ? request.status() : StatusLocacao.ATIVA);

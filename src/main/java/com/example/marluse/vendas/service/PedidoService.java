@@ -55,11 +55,16 @@ public class PedidoService {
                     .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
         }
 
-
         // Calcula forma de pagamento antes de definir o status inicial
         int numParcelas = request.numeroParcelas() != null && request.numeroParcelas() > 1
                 ? request.numeroParcelas() : 1;
         boolean isPendente = request.formaPagamento() == FormaPagamento.FIADO || numParcelas > 1;
+
+        // Fiado e parcelado exigem cliente cadastrado — não faz sentido registrar dívida sem devedor
+        if (isPendente && cliente == null) {
+            throw new IllegalArgumentException(
+                    "Pagamento fiado ou parcelado exige um cliente cadastrado");
+        }
         StatusLancamento statusLanc = isPendente ? StatusLancamento.PENDENTE : StatusLancamento.PAGO;
 
         StatusPedido statusInicial;
@@ -297,7 +302,17 @@ public class PedidoService {
                 lancamentoRepository.save(l);
             });
         }
-        return toResponse(pedidoRepository.save(pedido));
+        Pedido pedidoSalvo = pedidoRepository.save(pedido);
+
+        // Retorna a próxima parcela pendente para manter o badge na tabela
+        ParcelaResponse parcelaMesAtual = lancamentoRepository.findByPedidoId(id).stream()
+                .filter(l -> l.getStatus() == StatusLancamento.PENDENTE)
+                .min(Comparator.comparing(LancamentoFinanceiro::getDataVencimento,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(ParcelaResponse::from)
+                .orElse(null);
+
+        return PedidoResponse.from(pedidoSalvo, null, parcelaMesAtual);
     }
 
     public List<ParcelaResponse> listarParcelas(String pedidoId) {
