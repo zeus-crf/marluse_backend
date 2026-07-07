@@ -62,6 +62,16 @@ public class Locacao extends BaseEntity {
     @Column(name = "desconto_aplicado_em")
     private LocalDate descontoAplicadoEm;
 
+    @Column(name = "juros", precision = 10, scale = 2)
+    private BigDecimal juros;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_juros", length = 10)
+    private TipoDesconto tipoJuros;
+
+    @Column(name = "juros_aplicado_em")
+    private LocalDate jurosAplicadoEm;
+
     @Builder.Default
     @OneToMany(mappedBy = "locacao", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ItemLocacao> itens = new ArrayList<>();

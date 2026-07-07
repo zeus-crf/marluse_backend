@@ -109,9 +109,13 @@ public class LocacaoService {
 
         locacao.setDesconto(request.desconto());
         locacao.setTipoDesconto(request.tipoDesconto());
+        locacao.setJuros(request.juros());
+        locacao.setTipoJuros(request.tipoJuros());
         if (request.desconto() != null) locacao.setDescontoAplicadoEm(LocalDate.now());
+        if (request.juros() != null) locacao.setJurosAplicadoEm(LocalDate.now());
         if (request.entrega() != null ) locacao.setEntrega(new Entrega( null, locacao, request.entrega().endereco(), request.entrega().dataPrevista(), null, StatusEntrega.PENDENTE));
         BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
+        valorFinal = aplicarJuros(valorFinal, request.juros(), request.tipoJuros());
 
         locacao.setValorTotal(valorFinal);
 
@@ -195,6 +199,7 @@ public class LocacaoService {
             BigDecimal novoTotal = aplicarDesconto(locacao.getValorTotal(), request.desconto(), request.tipoDesconto());
             locacao.setValorTotal(novoTotal);
 
+
             // Redistribui valor entre parcelas ainda não pagas
             List<LancamentoFinanceiro> pendentes =
                     lancamentoRepository.findByLocacaoIdAndStatusNot(id, StatusLancamento.PAGO);
@@ -206,6 +211,31 @@ public class LocacaoService {
                 BigDecimal restante = novoTotal.subtract(pago);
                 if (restante.compareTo(BigDecimal.ZERO) < 0)
                     throw new IllegalArgumentException("Desconto resulta em valor menor que o já pago");
+                BigDecimal valorParcela = restante.divide(
+                        BigDecimal.valueOf(pendentes.size()), 2, RoundingMode.HALF_UP);
+                pendentes.forEach(l -> {
+                    l.setValor(valorParcela);
+                    lancamentoRepository.save(l);
+                });
+            }
+        }
+
+        if (request.juros() != null) {
+            locacao.setJuros(request.juros());
+            locacao.setTipoJuros(request.tipoJuros());
+            locacao.setJurosAplicadoEm(LocalDate.now());
+            BigDecimal totalComJuros = aplicarJuros(locacao.getValorTotal(), request.juros(), request.tipoJuros());
+            locacao.setValorTotal(totalComJuros);
+
+            // Redistribui valor entre parcelas ainda não pagas
+            List<LancamentoFinanceiro> pendentes =
+                    lancamentoRepository.findByLocacaoIdAndStatusNot(id, StatusLancamento.PAGO);
+            if (!pendentes.isEmpty()) {
+                BigDecimal pago = lancamentoRepository.findByLocacaoId(id).stream()
+                        .filter(l -> l.getStatus() == StatusLancamento.PAGO)
+                        .map(LancamentoFinanceiro::getValor)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal restante = totalComJuros.subtract(pago);
                 BigDecimal valorParcela = restante.divide(
                         BigDecimal.valueOf(pendentes.size()), 2, RoundingMode.HALF_UP);
                 pendentes.forEach(l -> {
@@ -308,6 +338,16 @@ public class LocacaoService {
         if (resulto.compareTo(BigDecimal.ZERO) < 0)
             throw new IllegalArgumentException("Desconto não pode ser maior que o valor total");
         return resulto;
+    }
+
+    private BigDecimal aplicarJuros(BigDecimal base, BigDecimal juros, TipoDesconto tipo) {
+        if (juros == null || juros.compareTo(BigDecimal.ZERO) == 0) return base;
+
+        BigDecimal calc = tipo == TipoDesconto.PERCENTUAL
+                ? base.multiply(juros).divide(BigDecimal.valueOf(100))
+                : juros;
+
+        return base.add(calc);
     }
 
     @Transactional

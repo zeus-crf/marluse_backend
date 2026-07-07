@@ -30,7 +30,10 @@ public record PedidoResponse(
         LocalDate descontoAplicadoEm,
         List<ParcelaResponse> parcelas,
         ParcelaResponse parcelaMesAtual,
-        EntregaResponse entrega
+        EntregaResponse entrega,
+        BigDecimal juros,
+        TipoDesconto tipoJuros,
+        LocalDate jurosAplicadoEm
 ) {
 
     public static PedidoResponse from(Pedido pedido) {
@@ -71,7 +74,10 @@ public record PedidoResponse(
                         pedido.getEntrega().getDataPrevista(),
                         pedido.getEntrega().getDataEntrega(),
                         pedido.getEntrega().getStatus()
-                ) : null
+                ) : null,
+                pedido.getJuros(),
+                pedido.getTipoJuros(),
+                pedido.getJurosAplicadoEm()
         );
     }
 

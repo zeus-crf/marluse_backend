@@ -31,7 +31,10 @@ public record LocacaoResponse(
         TipoDesconto tipoDesconto,
         LocalDate descontoAplicadoEm,
         List<ParcelaResponse> parcelas,
-        EntregaResponse entrega
+        EntregaResponse entrega,
+        BigDecimal juros,
+        TipoDesconto tipoJuros,
+        LocalDate jurosAplicadoEm
 ) {
     public static LocacaoResponse from(Locacao locacao) {
         return from(locacao, null);
@@ -67,7 +70,10 @@ public record LocacaoResponse(
                         locacao.getEntrega().getDataPrevista(),
                         locacao.getEntrega().getDataEntrega(),
                         locacao.getEntrega().getStatus()
-                ) : null
+                ) : null,
+                locacao.getJuros(),
+                locacao.getTipoJuros(),
+                locacao.getJurosAplicadoEm()
         );
     }
 }

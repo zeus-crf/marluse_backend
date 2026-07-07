@@ -117,9 +117,13 @@ public class PedidoService {
 
         pedido.setDesconto(request.desconto());
         pedido.setTipoDesconto(request.tipoDesconto());
+        pedido.setJuros(request.juros());
+        pedido.setTipoJuros(request.tipoJuros());
         if (request.entrega() != null) pedido.setEntrega(new Entrega(pedido, null, request.entrega().endereco(), request.entrega().dataPrevista(), null, StatusEntrega.PENDENTE));
         if (request.desconto() != null) pedido.setDescontoAplicadoEm(LocalDate.now());
+        if (request.juros() != null) pedido.setJurosAplicadoEm(LocalDate.now());
         BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
+        valorFinal = aplicarJuros(valorFinal, request.juros(), request.tipoJuros());
         pedido.setValorTotal(valorFinal);
 
 
@@ -281,6 +285,13 @@ public class PedidoService {
             pedido.setValorTotal(aplicarDesconto(pedido.getValorTotal(), request.desconto(), request.tipoDesconto()));
         }
 
+        if (request.juros() != null) {
+            pedido.setJuros(request.juros());
+            pedido.setTipoJuros(request.tipoJuros());
+            pedido.setJurosAplicadoEm(LocalDate.now());
+            pedido.setValorTotal(aplicarJuros(pedido.getValorTotal(), request.juros(), request.tipoJuros()));
+        }
+
         List<LancamentoFinanceiro> pendentes = lancamentoRepository
                 .findByPedidoIdAndStatusNot(id, StatusLancamento.PAGO);
         if (!pendentes.isEmpty()) {
@@ -327,6 +338,16 @@ public class PedidoService {
         if (resultado.compareTo(BigDecimal.ZERO) < 0)
             throw new IllegalArgumentException("Desconto não pode ser maior que o valor total");
         return resultado;
+    }
+
+    private BigDecimal aplicarJuros(BigDecimal base, BigDecimal juros, TipoDesconto tipo) {
+        if (juros == null || juros.compareTo(BigDecimal.ZERO) == 0) return base;
+
+        BigDecimal calc = tipo == TipoDesconto.PERCENTUAL
+                ? base.multiply(juros).divide(BigDecimal.valueOf(100))
+                : juros;
+
+        return base.add(calc);
     }
 
 

@@ -40,7 +40,11 @@ public record LocacaoRequest(
 
         LocalDate primeiroVencimento,
 
-        EntregaRequest entrega
+        EntregaRequest entrega,
+
+        BigDecimal juros,
+
+        TipoDesconto tipoJuros
 
 ) {
 }

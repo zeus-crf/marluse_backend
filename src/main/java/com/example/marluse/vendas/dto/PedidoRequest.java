@@ -35,6 +35,10 @@ public record PedidoRequest(
 
         LocalDate primeiroVencimento,
 
-        EntregaRequest entrega
+        EntregaRequest entrega,
+
+        BigDecimal juros,
+
+        TipoDesconto tipoJuros
 
 ) {}

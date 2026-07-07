@@ -13,5 +13,9 @@ public record PedidoAtualizarRequest(
 
         BigDecimal desconto,
 
-        TipoDesconto tipoDesconto
+        TipoDesconto tipoDesconto,
+
+        BigDecimal juros,
+
+        TipoDesconto tipoJuros
 ) {}

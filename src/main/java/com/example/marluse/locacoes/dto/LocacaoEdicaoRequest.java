@@ -15,6 +15,10 @@ public record LocacaoEdicaoRequest(
 
         BigDecimal desconto,
 
-        TipoDesconto tipoDesconto
+        TipoDesconto tipoDesconto,
+
+        BigDecimal juros,
+
+        TipoDesconto tipoJuros
 
 ) {}
