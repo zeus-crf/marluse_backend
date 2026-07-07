@@ -1,5 +1,6 @@
 package com.example.marluse.locacoes.dto;
 
+import com.example.marluse.entrega.dto.EntregaResponse;
 import com.example.marluse.financeiro.dto.ParcelaResponse;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.enums.StatusLocacao;
@@ -29,7 +30,8 @@ public record LocacaoResponse(
         BigDecimal desconto,
         TipoDesconto tipoDesconto,
         LocalDate descontoAplicadoEm,
-        List<ParcelaResponse> parcelas
+        List<ParcelaResponse> parcelas,
+        EntregaResponse entrega
 ) {
     public static LocacaoResponse from(Locacao locacao) {
         return from(locacao, null);
@@ -58,7 +60,14 @@ public record LocacaoResponse(
                 locacao.getDesconto(),
                 locacao.getTipoDesconto(),
                 locacao.getDescontoAplicadoEm(),
-                parcelas
+                parcelas,
+                locacao.getEntrega() != null ? new EntregaResponse(
+                        locacao.getEntrega().getId(),
+                        locacao.getEntrega().getEndereco(),
+                        locacao.getEntrega().getDataPrevista(),
+                        locacao.getEntrega().getDataEntrega(),
+                        locacao.getEntrega().getStatus()
+                ) : null
         );
     }
 }

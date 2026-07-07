@@ -1,6 +1,7 @@
 package com.example.marluse.locacoes.model;
 
 import com.example.marluse.clientes.model.Cliente;
+import com.example.marluse.entrega.model.Entrega;
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.shared.BaseEntity;
 import com.example.marluse.vendas.enums.FormaPagamento;
@@ -65,5 +66,7 @@ public class Locacao extends BaseEntity {
     @OneToMany(mappedBy = "locacao", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<ItemLocacao> itens = new ArrayList<>();
 
+    @OneToOne(mappedBy = "locacao", cascade = CascadeType.ALL, optional = true)
+    private Entrega entrega;
 
 }

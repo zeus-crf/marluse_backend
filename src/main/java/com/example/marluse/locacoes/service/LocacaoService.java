@@ -2,6 +2,8 @@ package com.example.marluse.locacoes.service;
 
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
+import com.example.marluse.entrega.enums.StatusEntrega;
+import com.example.marluse.entrega.model.Entrega;
 import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
@@ -108,6 +110,7 @@ public class LocacaoService {
         locacao.setDesconto(request.desconto());
         locacao.setTipoDesconto(request.tipoDesconto());
         if (request.desconto() != null) locacao.setDescontoAplicadoEm(LocalDate.now());
+        if (request.entrega() != null ) locacao.setEntrega(new Entrega( null, locacao, request.entrega().endereco(), request.entrega().dataPrevista(), null, StatusEntrega.PENDENTE));
         BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
 
         locacao.setValorTotal(valorFinal);

@@ -1,5 +1,6 @@
 package com.example.marluse.vendas.dto;
 
+import com.example.marluse.entrega.dto.EntregaResponse;
 import com.example.marluse.financeiro.dto.ParcelaResponse;
 import com.example.marluse.vendas.enums.TipoDesconto;
 import com.example.marluse.vendas.model.Pedido;
@@ -28,7 +29,8 @@ public record PedidoResponse(
         TipoDesconto tipoDesconto,
         LocalDate descontoAplicadoEm,
         List<ParcelaResponse> parcelas,
-        ParcelaResponse parcelaMesAtual
+        ParcelaResponse parcelaMesAtual,
+        EntregaResponse entrega
 ) {
 
     public static PedidoResponse from(Pedido pedido) {
@@ -62,7 +64,14 @@ public record PedidoResponse(
                 pedido.getTipoDesconto(),
                 pedido.getDescontoAplicadoEm(),
                 parcelas,
-                parcelaMesAtual
+                parcelaMesAtual,
+                pedido.getEntrega() != null ? new EntregaResponse(
+                        pedido.getEntrega().getId(),
+                        pedido.getEntrega().getEndereco(),
+                        pedido.getEntrega().getDataPrevista(),
+                        pedido.getEntrega().getDataEntrega(),
+                        pedido.getEntrega().getStatus()
+                ) : null
         );
     }
 
