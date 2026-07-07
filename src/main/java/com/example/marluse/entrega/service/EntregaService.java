@@ -9,6 +9,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+
 @Service
 @RequiredArgsConstructor
 public class EntregaService {
@@ -21,6 +23,7 @@ public class EntregaService {
         var entrega = entregaRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Entrega não encontrada"));
         entrega.setStatus(StatusEntrega.FEITA);
+        entrega.setDataEntrega(LocalDate.now());
 
         entregaRepository.save(entrega);
         return new EntregaResponse(entrega.getId(), entrega.getEndereco(), entrega.getDataPrevista(), entrega.getDataEntrega(), entrega.getStatus());
@@ -36,6 +39,6 @@ public class EntregaService {
         if (request.dataPrevista() != null) entrega.setDataPrevista(request.dataPrevista());
 
         entregaRepository.save(entrega);
-        return new EntregaResponse(entrega.getId(), entrega.getEndereco(), entrega.getDataEntrega(), entrega.getDataPrevista(), entrega.getStatus());
+        return new EntregaResponse(entrega.getId(), entrega.getEndereco(), entrega.getDataPrevista(), entrega.getDataEntrega(), entrega.getStatus());
     }
 }

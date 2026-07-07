@@ -2,6 +2,8 @@ package com.example.marluse.vendas.service;
 
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
+import com.example.marluse.entrega.enums.StatusEntrega;
+import com.example.marluse.entrega.model.Entrega;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.financeiro.enums.StatusLancamento;
@@ -115,6 +117,7 @@ public class PedidoService {
 
         pedido.setDesconto(request.desconto());
         pedido.setTipoDesconto(request.tipoDesconto());
+        if (request.entrega() != null) pedido.setEntrega(new Entrega(pedido, null, request.entrega().endereco(), request.entrega().dataPrevista(), null, StatusEntrega.PENDENTE));
         if (request.desconto() != null) pedido.setDescontoAplicadoEm(LocalDate.now());
         BigDecimal valorFinal = aplicarDesconto(total, request.desconto(), request.tipoDesconto());
         pedido.setValorTotal(valorFinal);

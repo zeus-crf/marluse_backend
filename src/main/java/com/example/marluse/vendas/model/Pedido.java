@@ -1,6 +1,7 @@
 package com.example.marluse.vendas.model;
 
 import com.example.marluse.clientes.model.Cliente;
+import com.example.marluse.entrega.model.Entrega;
 import com.example.marluse.shared.BaseEntity;
 import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
@@ -58,4 +59,7 @@ public class Pedido extends BaseEntity {
     @Builder.Default
     @OneToMany(mappedBy = "pedido", cascade =  CascadeType.ALL, orphanRemoval = true)
     private List<ItemPedido> itens = new ArrayList<>();
+
+    @OneToOne(mappedBy = "pedido", cascade = CascadeType.ALL, optional = true)
+    private Entrega entrega;
 }

@@ -1,5 +1,6 @@
 package com.example.marluse.vendas.dto;
 
+import com.example.marluse.entrega.dto.EntregaRequest;
 import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.StatusPedido;
 import com.example.marluse.vendas.enums.TipoDesconto;
@@ -32,6 +33,8 @@ public record PedidoRequest(
 
         Integer numeroParcelas,
 
-        LocalDate primeiroVencimento
+        LocalDate primeiroVencimento,
+
+        EntregaRequest entrega
 
 ) {}

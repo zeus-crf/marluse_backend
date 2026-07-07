@@ -20,10 +20,12 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class Entrega  extends BaseEntity {
 
-    @OneToOne(mappedBy = "pedido", cascade = CascadeType.ALL, optional  = true)
+    @OneToOne
+    @JoinColumn(name = "pedido_id")
     private Pedido pedido;
 
-    @OneToOne(mappedBy = "locacao", cascade = CascadeType.ALL, optional = true)
+    @OneToOne
+    @JoinColumn(name = "locacao_id")
     private Locacao locacao;
 
     private String endereco;
@@ -33,4 +35,6 @@ public class Entrega  extends BaseEntity {
     private LocalDate dataEntrega;
 
     private StatusEntrega status;
+
+
 }

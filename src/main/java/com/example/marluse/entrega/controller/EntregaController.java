@@ -23,7 +23,7 @@ public class EntregaController {
     }
 
     @PutMapping("/{id}")
-    ResponseEntity<ApiResponse<EntregaResponse>> editar(@PathVariable String id, @Valid EntregaAtualizarRequest request) {
+    ResponseEntity<ApiResponse<EntregaResponse>> editar(@PathVariable String id, @Valid @RequestBody EntregaAtualizarRequest request) {
         return ResponseEntity.ok(ApiResponse.ok("Entrega editada com sucesso", entregaService.editar(id, request)));
     }
 }
