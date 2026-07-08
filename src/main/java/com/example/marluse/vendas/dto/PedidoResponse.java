@@ -34,6 +34,7 @@ public record PedidoResponse(
         EntregaResponse entrega,
         BigDecimal juros,
         TipoDesconto tipoJuros,
+        LocalDate dataMovimento,
         LocalDate jurosAplicadoEm
 ) {
 
@@ -79,6 +80,7 @@ public record PedidoResponse(
                 ) : null,
                 pedido.getJuros(),
                 pedido.getTipoJuros(),
+                pedido.getDataMovimento() != null ? pedido.getDataMovimento() : null,
                 pedido.getJurosAplicadoEm()
         );
     }

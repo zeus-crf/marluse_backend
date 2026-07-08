@@ -5,6 +5,7 @@ import com.example.marluse.vendas.enums.TipoDesconto;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record LocacaoEdicaoRequest(
 
@@ -19,6 +20,8 @@ public record LocacaoEdicaoRequest(
 
         BigDecimal juros,
 
-        TipoDesconto tipoJuros
+        TipoDesconto tipoJuros,
+
+        LocalDate dataMovimento
 
 ) {}

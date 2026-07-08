@@ -4,6 +4,7 @@ import com.example.marluse.vendas.enums.FormaPagamento;
 import com.example.marluse.vendas.enums.TipoDesconto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record PedidoAtualizarRequest(
 
@@ -17,5 +18,7 @@ public record PedidoAtualizarRequest(
 
         BigDecimal juros,
 
-        TipoDesconto tipoJuros
+        TipoDesconto tipoJuros,
+
+        LocalDate dataMovimento
 ) {}

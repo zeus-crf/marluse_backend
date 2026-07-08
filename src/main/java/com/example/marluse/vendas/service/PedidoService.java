@@ -79,6 +79,7 @@ public class PedidoService {
                 .observacao(request.observacao())
                 .dataVencimento(request.dataVencimento())
                 .valorTotal(BigDecimal.ZERO)
+                .dataMovimento(request.dataMovimento() != null ? request.dataMovimento() : LocalDate.now())
                 .build();
 
         if (cliente != null) {
@@ -276,6 +277,7 @@ public class PedidoService {
         Pedido pedido = buscarEntidade(id);
         if (request.formaPagamento() != null) pedido.setFormaPagamento(request.formaPagamento());
         if (request.observacao() != null) pedido.setObservacao(request.observacao());
+        if (request.dataMovimento() != null) pedido.setDataMovimento(request.dataMovimento());
 
         if (request.desconto() != null ) {
             pedido.setDesconto(request.desconto());

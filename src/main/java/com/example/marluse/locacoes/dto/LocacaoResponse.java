@@ -35,6 +35,7 @@ public record LocacaoResponse(
         EntregaResponse entrega,
         BigDecimal juros,
         TipoDesconto tipoJuros,
+        LocalDate dataMovimento,
         LocalDate jurosAplicadoEm
 ) {
     public static LocacaoResponse from(Locacao locacao) {
@@ -75,6 +76,7 @@ public record LocacaoResponse(
                 ) : null,
                 locacao.getJuros(),
                 locacao.getTipoJuros(),
+                locacao.getDataMovimento() != null ? locacao.getDataMovimento() : null,
                 locacao.getJurosAplicadoEm()
         );
     }

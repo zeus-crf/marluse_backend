@@ -71,6 +71,7 @@ public class LocacaoService {
                 .dataDevolucaoPrevista(request.dataDevolucaoPrevista())
                 .observacao(request.observacao())
                 .valorTotal(BigDecimal.ZERO)
+                .dataMovimento(request.dataMovimento() != null ? request.dataMovimento() : LocalDate.now() )
                 .build();
 
         locacao.setCliente(cliente);
@@ -190,6 +191,8 @@ public class LocacaoService {
         if (locacao.getStatus() == StatusLocacao.CANCELADA || locacao.getStatus() == StatusLocacao.DEVOLVIDA) {
             throw new IllegalArgumentException("Não é possível editar uma locação " + locacao.getStatus().name().toLowerCase());
         }
+
+        if (request.dataMovimento() != null) locacao.setDataMovimento(request.dataMovimento());
 
         if (request.desconto() != null) {
             locacao.setDesconto(request.desconto());

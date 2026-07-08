@@ -79,4 +79,7 @@ public class Locacao extends BaseEntity {
     @OneToOne(mappedBy = "locacao", cascade = CascadeType.ALL, optional = true)
     private Entrega entrega;
 
+    @Column(name = "data_movimento")
+    private LocalDate dataMovimento;
+
 }
