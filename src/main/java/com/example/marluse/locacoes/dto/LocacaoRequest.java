@@ -44,7 +44,9 @@ public record LocacaoRequest(
 
         BigDecimal juros,
 
-        TipoDesconto tipoJuros
+        TipoDesconto tipoJuros,
+
+        LocalDate dataMovimento
 
 ) {
 }

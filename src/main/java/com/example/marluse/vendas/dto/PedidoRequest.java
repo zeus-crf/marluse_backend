@@ -39,6 +39,8 @@ public record PedidoRequest(
 
         BigDecimal juros,
 
-        TipoDesconto tipoJuros
+        TipoDesconto tipoJuros,
+
+        LocalDate dataMovimento
 
 ) {}
