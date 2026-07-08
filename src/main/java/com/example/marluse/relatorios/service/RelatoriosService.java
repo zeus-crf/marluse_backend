@@ -38,7 +38,6 @@ public class RelatoriosService {
 
         BigDecimal receita     = lancamentoRepository.somarReceitaPorPeriodo(inicioPeriodo, hoje);
         BigDecimal despesas    = lancamentoRepository.somarDespesaPorPeriodo(inicioPeriodo, hoje);
-<<<<<<< HEAD
         BigDecimal cmv         = itemPedidoRepository.somarCmvPorPeriodo(
                 inicioPeriodo.atStartOfDay(), hoje.atTime(23, 59, 59));
         BigDecimal saldo       = receita.subtract(despesas);
