@@ -34,5 +34,6 @@ build/
 
 ### Environment ###
 .env
+src/main/resources/application.yml
 
 

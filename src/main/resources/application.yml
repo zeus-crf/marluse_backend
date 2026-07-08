@@ -9,9 +9,12 @@ spring:
 
   datasource:
     url: jdbc:mysql://localhost:3306/marluse?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: miguel2007$
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+  flyway:
+    enabled: false   # desligado em dev — Flyway só roda no perfil docker
 
   jpa:
     hibernate:
@@ -24,7 +27,7 @@ spring:
 
 security:
   jwt:
-    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    secret: ${JWT_SECRET:}
     access-expiration: 900000
     refresh-expiration: 604800000
   cookie:

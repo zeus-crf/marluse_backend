@@ -4,7 +4,15 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true   # não executa V1 se o banco já existir
+    baseline-version: 1
+
   jpa:
+    hibernate:
+      ddl-auto: validate         # Hibernate só valida — Flyway que migra
     show-sql: false
 
 security:
@@ -16,3 +24,7 @@ app:
   admin:
     email: ${ADMIN_EMAIL}
     senha: ${ADMIN_SENHA}
+
+logging:
+  level:
+    com.marluse: WARN
