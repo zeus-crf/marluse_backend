@@ -16,7 +16,6 @@ public record ProdutoAtualizarRequest(
         BigDecimal preco,
         Integer quantidadeEstoque,
         Integer estoqueMinimo,
-        UnidadeMedida medida,
-        BigDecimal valorCompra
+        UnidadeMedida medida
 ) {
 }
