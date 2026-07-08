@@ -39,4 +39,7 @@ public class Produto extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     UnidadeMedida medida;
+
+    @Column(name = "valor_compra", precision = 10, scale = 2)
+    private BigDecimal valorCompra;
 }

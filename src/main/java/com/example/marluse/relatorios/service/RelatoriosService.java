@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +37,9 @@ public class RelatoriosService {
 
         BigDecimal receita     = lancamentoRepository.somarReceitaPorPeriodo(inicioPeriodo, hoje);
         BigDecimal despesas    = lancamentoRepository.somarDespesaPorPeriodo(inicioPeriodo, hoje);
+        BigDecimal cmv         = itemPedidoRepository.somarCmvPorPeriodo(inicioPeriodo, hoje);
         BigDecimal saldo       = receita.subtract(despesas);
+        BigDecimal lucroLiquido = receita.subtract(cmv).subtract(despesas);
         long totalPedidos      = pedidoRepository.contarVendasPorPeriodo(StatusPedido.PAGO, inicioPeriodo, hoje);
         BigDecimal ticketMedio = totalPedidos > 0
                 ? receita.divide(BigDecimal.valueOf(totalPedidos), 2, RoundingMode.HALF_UP)
@@ -69,7 +70,8 @@ public class RelatoriosService {
                 variacao(receitaMes, receitaAnt),
                 variacao(despesasMes, despesasAnt),
                 variacao(saldoMes, saldoAnt),
-                variacao(ticketMes, ticketAnt)
+                variacao(ticketMes, ticketAnt),
+                cmv, lucroLiquido
         );
     }
 
@@ -101,6 +103,12 @@ public class RelatoriosService {
                         l -> YearMonth.from(l.getDataPagamento()),
                         Collectors.reducing(BigDecimal.ZERO, LancamentoFinanceiro::getValor, BigDecimal::add)));
 
+        Map<YearMonth, BigDecimal> cmvMap = itemPedidoRepository.somarCmvPorDia(inicio, hoje)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        r -> YearMonth.from((LocalDate) r[0]),
+                        Collectors.reducing(BigDecimal.ZERO, r -> (BigDecimal) r[1], BigDecimal::add)));
+
         List<ReceitaMensalItemResponse> result = new ArrayList<>();
         YearMonth ym = YearMonth.from(inicio);
         YearMonth fim = YearMonth.from(hoje);
@@ -109,7 +117,8 @@ public class RelatoriosService {
                     ym.toString(),
                     vendasMap.getOrDefault(ym, BigDecimal.ZERO),
                     locacoesMap.getOrDefault(ym, BigDecimal.ZERO),
-                    despesasMap.getOrDefault(ym, BigDecimal.ZERO)
+                    despesasMap.getOrDefault(ym, BigDecimal.ZERO),
+                    cmvMap.getOrDefault(ym, BigDecimal.ZERO)
             ));
             ym = ym.plusMonths(1);
         }
@@ -141,15 +150,17 @@ public class RelatoriosService {
     // ── Top produtos ──────────────────────────────────────────────────────────
 
     public List<TopProdutoResponse> topProdutos(int limite, String periodo) {
-        LocalDate inicio  = resolverInicio(periodo, LocalDate.now());
-        LocalDateTime ini = inicio.atStartOfDay();
-        LocalDateTime fim = LocalDate.now().atTime(23, 59, 59);
-        List<Object[]> rows = itemPedidoRepository.topProdutos(ini, fim, PageRequest.of(0, limite));
+        LocalDate inicio = resolverInicio(periodo, LocalDate.now());
+        LocalDate fim    = LocalDate.now();
+        List<Object[]> rows = itemPedidoRepository.topProdutos(inicio, fim);
         return rows.stream()
+                .limit(limite)
                 .map(r -> new TopProdutoResponse(
                         (String) r[0],
                         ((Number) r[1]).longValue(),
-                        (BigDecimal) r[2]))
+                        (BigDecimal) r[2],
+                        (BigDecimal) r[3],
+                        (BigDecimal) r[4]))
                 .toList();
     }
 

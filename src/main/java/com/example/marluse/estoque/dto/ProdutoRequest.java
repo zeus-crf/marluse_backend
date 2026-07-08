@@ -25,6 +25,8 @@ public record ProdutoRequest(
         Integer estoqueMinimo,
 
         @NotNull(message = "Unidade de medida é obrigatória")
-        UnidadeMedida medida
+        UnidadeMedida medida,
+
+        BigDecimal valorCompra
 ) {
 }

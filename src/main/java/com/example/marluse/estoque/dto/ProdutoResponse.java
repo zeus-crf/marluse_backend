@@ -14,7 +14,8 @@ public record ProdutoResponse(
         Integer estoqueMinimo,
         boolean ativo,
         boolean estoqueBaixo,
-        UnidadeMedida medida
+        UnidadeMedida medida,
+        BigDecimal valorCompra
 ) {
     public static ProdutoResponse from(Produto produto){
         return new ProdutoResponse(
@@ -26,7 +27,8 @@ public record ProdutoResponse(
                 produto.getEstoqueMinimo(),
                 produto.isAtivo(),
                 produto.getQuantidadeEstoque() <= produto.getEstoqueMinimo(),
-                produto.getMedida()
+                produto.getMedida(),
+                produto.getValorCompra()
         );
     }
 }
