@@ -1,9 +1,10 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # url/username/password vêm via relaxed binding do Spring Boot:
+    # SPRING_DATASOURCE_URL     → spring.datasource.url
+    # SPRING_DATASOURCE_USERNAME → spring.datasource.username
+    # SPRING_DATASOURCE_PASSWORD → spring.datasource.password
 
   flyway:
     enabled: true
