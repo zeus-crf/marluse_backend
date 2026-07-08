@@ -6,5 +6,6 @@ public record ReceitaMensalItemResponse(
         String mes,
         BigDecimal vendas,
         BigDecimal locacoes,
-        BigDecimal despesas
+        BigDecimal despesas,
+        BigDecimal cmv
 ) {}
