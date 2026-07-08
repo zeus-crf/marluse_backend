@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public record TopProdutoResponse(
         String nome,
         long quantidade,
-        BigDecimal total,
+        BigDecimal lucro,
         BigDecimal custo,
-        BigDecimal lucro
+        BigDecimal total
 ) {}

@@ -21,6 +21,9 @@ public class Produto extends BaseEntity {
 
     private String descricao;
 
+    @Column(nullable = false)
+    private BigDecimal valorCompra;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal preco;
 
@@ -40,6 +43,4 @@ public class Produto extends BaseEntity {
     @Column(nullable = false)
     UnidadeMedida medida;
 
-    @Column(name = "valor_compra", precision = 10, scale = 2)
-    private BigDecimal valorCompra;
 }

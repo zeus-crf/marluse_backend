@@ -1,3 +1,4 @@
+
 package com.example.marluse.relatorios.service;
 
 import com.example.marluse.financeiro.enums.StatusLancamento;
@@ -37,7 +38,9 @@ public class RelatoriosService {
 
         BigDecimal receita     = lancamentoRepository.somarReceitaPorPeriodo(inicioPeriodo, hoje);
         BigDecimal despesas    = lancamentoRepository.somarDespesaPorPeriodo(inicioPeriodo, hoje);
-        BigDecimal cmv         = itemPedidoRepository.somarCmvPorPeriodo(inicioPeriodo, hoje);
+<<<<<<< HEAD
+        BigDecimal cmv         = itemPedidoRepository.somarCmvPorPeriodo(
+                inicioPeriodo.atStartOfDay(), hoje.atTime(23, 59, 59));
         BigDecimal saldo       = receita.subtract(despesas);
         BigDecimal lucroLiquido = receita.subtract(cmv).subtract(despesas);
         long totalPedidos      = pedidoRepository.contarVendasPorPeriodo(StatusPedido.PAGO, inicioPeriodo, hoje);
@@ -51,6 +54,8 @@ public class RelatoriosService {
 
         BigDecimal receitaMes  = lancamentoRepository.somarReceitaPorPeriodo(inicioMesAtual, hoje);
         BigDecimal despesasMes = lancamentoRepository.somarDespesaPorPeriodo(inicioMesAtual, hoje);
+        BigDecimal cmvMes      = itemPedidoRepository.somarCmvPorPeriodo(
+                inicioMesAtual.atStartOfDay(), hoje.atTime(23, 59, 59));
         BigDecimal saldoMes    = receitaMes.subtract(despesasMes);
         long pedidosMes        = pedidoRepository.contarVendasPorPeriodo(StatusPedido.PAGO, inicioMesAtual, hoje);
         BigDecimal ticketMes   = pedidosMes > 0
@@ -59,6 +64,8 @@ public class RelatoriosService {
 
         BigDecimal receitaAnt  = lancamentoRepository.somarReceitaPorPeriodo(inicioMesAnterior, fimMesAnterior);
         BigDecimal despesasAnt = lancamentoRepository.somarDespesaPorPeriodo(inicioMesAnterior, fimMesAnterior);
+        BigDecimal cmvAnt      = itemPedidoRepository.somarCmvPorPeriodo(
+                inicioMesAnterior.atStartOfDay(), fimMesAnterior.atTime(23, 59, 59));
         BigDecimal saldoAnt    = receitaAnt.subtract(despesasAnt);
         long pedidosAnt        = pedidoRepository.contarVendasPorPeriodo(StatusPedido.PAGO, inicioMesAnterior, fimMesAnterior);
         BigDecimal ticketAnt   = pedidosAnt > 0
@@ -71,7 +78,8 @@ public class RelatoriosService {
                 variacao(despesasMes, despesasAnt),
                 variacao(saldoMes, saldoAnt),
                 variacao(ticketMes, ticketAnt),
-                cmv, lucroLiquido
+                cmv,
+                lucroLiquido
         );
     }
 
@@ -103,11 +111,14 @@ public class RelatoriosService {
                         l -> YearMonth.from(l.getDataPagamento()),
                         Collectors.reducing(BigDecimal.ZERO, LancamentoFinanceiro::getValor, BigDecimal::add)));
 
-        Map<YearMonth, BigDecimal> cmvMap = itemPedidoRepository.somarCmvPorDia(inicio, hoje)
+        // CMV por mês — agrupa resultado da query em mapa YearMonth → valor
+        Map<YearMonth, BigDecimal> cmvMap = itemPedidoRepository
+                .cmvPorMes(inicio.atStartOfDay(), hoje.atTime(23, 59, 59))
                 .stream()
-                .collect(Collectors.groupingBy(
-                        r -> YearMonth.from((LocalDate) r[0]),
-                        Collectors.reducing(BigDecimal.ZERO, r -> (BigDecimal) r[1], BigDecimal::add)));
+                .collect(Collectors.toMap(
+                        r -> YearMonth.parse((String) r[0]),
+                        r -> (BigDecimal) r[1]
+                ));
 
         List<ReceitaMensalItemResponse> result = new ArrayList<>();
         YearMonth ym = YearMonth.from(inicio);
@@ -152,15 +163,21 @@ public class RelatoriosService {
     public List<TopProdutoResponse> topProdutos(int limite, String periodo) {
         LocalDate inicio = resolverInicio(periodo, LocalDate.now());
         LocalDate fim    = LocalDate.now();
-        List<Object[]> rows = itemPedidoRepository.topProdutos(inicio, fim);
+        List<Object[]> rows = itemPedidoRepository.topProdutos(
+                inicio.atStartOfDay(), fim.atTime(23, 59, 59), PageRequest.of(0, limite));
         return rows.stream()
-                .limit(limite)
-                .map(r -> new TopProdutoResponse(
-                        (String) r[0],
-                        ((Number) r[1]).longValue(),
-                        (BigDecimal) r[2],
-                        (BigDecimal) r[3],
-                        (BigDecimal) r[4]))
+                .map(r -> {
+                    BigDecimal total = (BigDecimal) r[2];
+                    BigDecimal custo = (BigDecimal) r[3];
+                    BigDecimal lucro = total.subtract(custo);
+                    return new TopProdutoResponse(
+                            (String) r[0],
+                            ((Number) r[1]).longValue(),
+                            lucro,
+                            custo,
+                            total
+                    );
+                })
                 .toList();
     }
 

@@ -1,6 +1,7 @@
 package com.example.marluse.estoque.dto;
 
 import com.example.marluse.estoque.enums.UnidadeMedida;
+import jakarta.persistence.Column;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +15,10 @@ public record ProdutoRequest(
 
         String descricao,
 
+        @NotNull(message = "O valor de compra é obrigatorio")
+        @DecimalMin(value = "0.0", inclusive = false, message = "O Preço deve ser maior que 0")
+        BigDecimal valorCompra,
+
         @NotNull(message = "Preço é obrigatório")
         @DecimalMin(value = "0.0", inclusive = false, message = "Preço deve ser maior que zero")
         BigDecimal preco,
@@ -25,8 +30,6 @@ public record ProdutoRequest(
         Integer estoqueMinimo,
 
         @NotNull(message = "Unidade de medida é obrigatória")
-        UnidadeMedida medida,
-
-        BigDecimal valorCompra
+        UnidadeMedida medida
 ) {
 }

@@ -27,6 +27,7 @@ public class ProdutoService {
                 .nome(request.nome())
                 .descricao(request.descricao())
                 .preco(request.preco())
+                .valorCompra(request.valorCompra())
                 .quantidadeEstoque(request.quantidadeEstoque() != null ? request.quantidadeEstoque() : 0)
                 .estoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0)
                 .ativo(true)
@@ -57,6 +58,7 @@ public class ProdutoService {
 
         if (request.nome() != null) produto.setNome(request.nome());
         if (request.descricao() != null) produto.setDescricao(request.descricao());
+        if (request.valorCompra() != null) produto.setValorCompra(request.valorCompra());
         if (request.preco() != null) produto.setPreco(request.preco());
         if (request.medida() != null) produto.setMedida(request.medida());
         if (request.quantidadeEstoque() != null) produto.setQuantidadeEstoque(request.quantidadeEstoque());

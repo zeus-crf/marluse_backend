@@ -12,6 +12,7 @@ public record ProdutoAtualizarRequest(
 
         String nome,
         String descricao,
+        BigDecimal valorCompra,
         BigDecimal preco,
         Integer quantidadeEstoque,
         Integer estoqueMinimo,
