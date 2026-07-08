@@ -19,6 +19,8 @@ security:
   jwt:
     secret: ${JWT_SECRET}
     expiration: 86400000
+  cookie:
+    secure: true   # HTTPS obrigatório em produção
 
 app:
   admin:
