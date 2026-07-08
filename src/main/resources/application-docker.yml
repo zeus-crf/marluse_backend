@@ -11,3 +11,8 @@ security:
   jwt:
     secret: ${JWT_SECRET}
     expiration: 86400000
+
+app:
+  admin:
+    email: ${ADMIN_EMAIL}
+    senha: ${ADMIN_SENHA}
