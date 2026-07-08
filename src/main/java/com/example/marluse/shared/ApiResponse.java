@@ -3,7 +3,10 @@ package com.example.marluse.shared;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
