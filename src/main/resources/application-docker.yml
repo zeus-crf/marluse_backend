@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?createDatabaseIfNotExist=true&useSSL=${DB_USE_SSL:false}&allowPublicKeyRetrieval=true
     username: ${DB_USER}
     password: ${DB_PASSWORD}
 
@@ -23,6 +23,8 @@ security:
     secure: true   # HTTPS obrigatório em produção
 
 app:
+  cors:
+    allowed-origin: ${CORS_ORIGIN}
   admin:
     email: ${ADMIN_EMAIL}
     senha: ${ADMIN_SENHA}

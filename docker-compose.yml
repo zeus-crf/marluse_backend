@@ -32,6 +32,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_SENHA: ${ADMIN_SENHA}
     depends_on:
