@@ -18,8 +18,9 @@ spring:
 
 security:
   jwt:
-    secret: ${JWT_SECRET}        # resolvido via -DJWT_SECRET=$JWT_SECRET no Dockerfile
-    expiration: 86400000
+    secret: ${JWT_SECRET}          # resolvido via -DJWT_SECRET=$JWT_SECRET no Dockerfile
+    access-expiration: 900000      # 15 min (access token)
+    refresh-expiration: 604800000  # 7 dias (refresh token)
   cookie:
     secure: true   # HTTPS obrigatório em produção
 
