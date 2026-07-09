@@ -11,7 +11,7 @@ COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "exec java \
   -Dspring.profiles.active=docker \
-  -Dspring.datasource.password=$MYSQLPASSWORD \
+  -Dspring.datasource.password=$DB_PASSWORD \
   -DJWT_SECRET=$JWT_SECRET \
   -DCORS_ORIGIN=$CORS_ORIGIN \
   -DADMIN_EMAIL=$ADMIN_EMAIL \
