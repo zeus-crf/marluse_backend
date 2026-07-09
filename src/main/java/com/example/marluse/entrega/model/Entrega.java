@@ -34,6 +34,7 @@ public class Entrega  extends BaseEntity {
 
     private LocalDate dataEntrega;
 
+    @Enumerated(EnumType.STRING)
     private StatusEntrega status;
 
 
