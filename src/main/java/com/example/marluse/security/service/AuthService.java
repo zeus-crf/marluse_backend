@@ -113,7 +113,7 @@ public class AuthService {
                 .secure(cookieSecure)
                 .path("/")
                 .maxAge(accessExpiration / 1000)
-                .sameSite("Strict")
+                .sameSite("None")
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, access.toString());
@@ -123,7 +123,7 @@ public class AuthService {
                 .secure(cookieSecure)
                 .path("/api/auth")
                 .maxAge(refreshExpiration / 1000)
-                .sameSite("Strict")
+                .sameSite("None")
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, refresh.toString());
@@ -133,18 +133,20 @@ public class AuthService {
 
         ResponseCookie access = ResponseCookie.from("access_token")
                 .httpOnly(true)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite("None")
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, access.toString());
 
         ResponseCookie refresh = ResponseCookie.from("refresh_token")
                 .httpOnly(true)
+                .secure(cookieSecure)
                 .path("/api/auth")
                 .maxAge(0)
-                .sameSite("Strict")
+                .sameSite("None")
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, refresh.toString());
