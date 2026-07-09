@@ -9,11 +9,4 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "exec java \
-  -Dspring.profiles.active=docker \
-  -Dspring.datasource.password=$DB_PASSWORD \
-  -DJWT_SECRET=$JWT_SECRET \
-  -DCORS_ORIGIN=$CORS_ORIGIN \
-  -DADMIN_EMAIL=$ADMIN_EMAIL \
-  -DADMIN_SENHA=$ADMIN_SENHA \
-  -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "echo '=== ENV CHECK ===' && echo DB_PASSWORD_LEN=${#DB_PASSWORD} && echo JWT_SECRET_LEN=${#JWT_SECRET} && exec java -Dspring.profiles.active=docker -Dspring.datasource.password=$DB_PASSWORD -DJWT_SECRET=$JWT_SECRET -DCORS_ORIGIN=$CORS_ORIGIN -DADMIN_EMAIL=$ADMIN_EMAIL -DADMIN_SENHA=$ADMIN_SENHA -jar app.jar"]
