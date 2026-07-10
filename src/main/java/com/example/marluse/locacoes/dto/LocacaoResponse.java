@@ -32,6 +32,7 @@ public record LocacaoResponse(
         TipoDesconto tipoDesconto,
         LocalDate descontoAplicadoEm,
         List<ParcelaResponse> parcelas,
+        ParcelaResponse parcelaMesAtual,
         EntregaResponse entrega,
         BigDecimal juros,
         TipoDesconto tipoJuros,
@@ -39,10 +40,14 @@ public record LocacaoResponse(
         LocalDate jurosAplicadoEm
 ) {
     public static LocacaoResponse from(Locacao locacao) {
-        return from(locacao, null);
+        return from(locacao, null, null);
     }
 
     public static LocacaoResponse from(Locacao locacao, List<ParcelaResponse> parcelas) {
+        return from(locacao, parcelas, null);
+    }
+
+    public static LocacaoResponse from(Locacao locacao, List<ParcelaResponse> parcelas, ParcelaResponse parcelaMesAtual) {
         BigDecimal bruto = locacao.getItens().stream()
                 .map(i -> i.getSubtotal())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -67,6 +72,7 @@ public record LocacaoResponse(
                 locacao.getTipoDesconto(),
                 locacao.getDescontoAplicadoEm(),
                 parcelas,
+                parcelaMesAtual,
                 locacao.getEntrega() != null ? new EntregaResponse(
                         locacao.getEntrega().getId(),
                         locacao.getEntrega().getEndereco(),

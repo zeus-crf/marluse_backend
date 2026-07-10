@@ -33,7 +33,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -157,9 +159,29 @@ public class LocacaoService {
     }
 
     public List<LocacaoResponse> listarTodas(){
+        // Próxima parcela PENDENTE por locação (parceladas com pagamento em aberto)
+        Map<String, ParcelaResponse> proximaPendente = new HashMap<>();
+        lancamentoRepository.findProximasParcelasPendentesLocacoes().forEach(l -> {
+            if (l.getLocacao() != null) {
+                proximaPendente.putIfAbsent(l.getLocacao().getId(), ParcelaResponse.from(l));
+            }
+        });
+
+        // Última parcela PAGA para locações totalmente pagas (exibe "N/N pagas")
+        Map<String, ParcelaResponse> ultimaPaga = new HashMap<>();
+        lancamentoRepository.findUltimasParcelasDeLocacoesPagas().forEach(l -> {
+            if (l.getLocacao() != null) {
+                ultimaPaga.putIfAbsent(l.getLocacao().getId(), ParcelaResponse.from(l));
+            }
+        });
+
+        // PENDENTE tem prioridade sobre PAGO
+        Map<String, ParcelaResponse> parcelaPorLocacao = new HashMap<>(ultimaPaga);
+        parcelaPorLocacao.putAll(proximaPendente);
+
         return locacaoRepository.findAll()
                 .stream()
-                .map(LocacaoResponse::from)
+                .map(l -> LocacaoResponse.from(l, null, parcelaPorLocacao.get(l.getId())))
                 .toList();
     }
 

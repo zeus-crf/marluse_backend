@@ -102,6 +102,27 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
     """)
     List<LancamentoFinanceiro> findUltimasParcelasDePedidosPagos();
 
+    @Query("SELECT l FROM LancamentoFinanceiro l " +
+            "WHERE l.locacao IS NOT NULL " +
+            "AND l.totalParcelas > 1 " +
+            "AND l.status = 'PENDENTE' " +
+            "ORDER BY l.dataVencimento ASC NULLS LAST")
+    List<LancamentoFinanceiro> findProximasParcelasPendentesLocacoes();
+
+    @Query("""
+        SELECT l FROM LancamentoFinanceiro l
+        WHERE l.locacao IS NOT NULL
+        AND l.totalParcelas > 1
+        AND l.status = 'PAGO'
+        AND NOT EXISTS (
+            SELECT 1 FROM LancamentoFinanceiro l2
+            WHERE l2.locacao = l.locacao
+            AND l2.status = 'PENDENTE'
+        )
+        ORDER BY l.numParcelas DESC NULLS LAST
+    """)
+    List<LancamentoFinanceiro> findUltimasParcelasDeLocacoesPagas();
+
     /** Soma somente lançamentos de locações (locacao IS NOT NULL) pagos no período — usa dataPagamento */
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l " +
            "WHERE l.locacao IS NOT NULL AND l.status = 'PAGO' " +

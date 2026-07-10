@@ -106,6 +106,11 @@ public class AuthService {
         limparCookies(response);
     }
 
+    private String sameSitePolicy() {
+        // SameSite=None exige Secure=true (HTTPS). Em dev (secure=false) usamos Lax.
+        return cookieSecure ? "None" : "Lax";
+    }
+
     private void setarCookies(HttpServletResponse response, String accessToken, String refreshToken) {
 
         ResponseCookie access = ResponseCookie.from("access_token", accessToken)
@@ -113,7 +118,7 @@ public class AuthService {
                 .secure(cookieSecure)
                 .path("/")
                 .maxAge(accessExpiration / 1000)
-                .sameSite("None")
+                .sameSite(sameSitePolicy())
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, access.toString());
@@ -123,7 +128,7 @@ public class AuthService {
                 .secure(cookieSecure)
                 .path("/api/auth")
                 .maxAge(refreshExpiration / 1000)
-                .sameSite("None")
+                .sameSite(sameSitePolicy())
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, refresh.toString());
@@ -136,7 +141,7 @@ public class AuthService {
                 .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
-                .sameSite("None")
+                .sameSite(sameSitePolicy())
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, access.toString());
@@ -146,7 +151,7 @@ public class AuthService {
                 .secure(cookieSecure)
                 .path("/api/auth")
                 .maxAge(0)
-                .sameSite("None")
+                .sameSite(sameSitePolicy())
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, refresh.toString());
