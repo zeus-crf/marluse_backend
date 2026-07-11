@@ -1,6 +1,7 @@
 package com.example.marluse.clientes.controller;
 
 import com.example.marluse.clientes.dto.ClienteAtualizarRequest;
+import com.example.marluse.clientes.dto.ClienteHistoricoResponse;
 import com.example.marluse.clientes.dto.ClienteRequest;
 import com.example.marluse.clientes.dto.ClienteResponse;
 import com.example.marluse.clientes.service.ClienteService;
@@ -34,6 +35,11 @@ public class ClienteController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ClienteResponse>> listarPorId(@PathVariable String id){
         return ResponseEntity.ok(ApiResponse.ok(clienteService.listarPorId(id)));
+    }
+
+    @GetMapping("/{id}/historico")
+    public ResponseEntity<ApiResponse<ClienteHistoricoResponse>> historicoCliente(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok(clienteService.historicoCliente(id)));
     }
 
     @PutMapping("/{id}")
