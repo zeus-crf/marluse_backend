@@ -89,12 +89,15 @@ public class LocacaoService {
 
         BigDecimal total = BigDecimal.ZERO;
 
+        // Só desconta estoque na criação se não houver entrega — sem entrega significa retirada no local
+        boolean temEntrega = request.entrega() != null;
+
         for (ItemLocacaoRequest itemRequest : request.itens()){
             Produto produto = produtoRepository.findById(itemRequest.produtoId())
                     .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
 
-            // Orçamento não reserva estoque
-            if (statusInicial != StatusLocacao.ORCAMENTO) {
+            // Orçamento nunca baixa estoque; locação com entrega aguarda confirmação da entrega
+            if (statusInicial != StatusLocacao.ORCAMENTO && !temEntrega) {
                 if (produto.getQuantidadeEstoque() < itemRequest.quantidade()){
                     throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
                 }
@@ -133,6 +136,11 @@ public class LocacaoService {
 
 
 
+        // Marca que o estoque foi baixado imediatamente (retirada no local, sem entrega)
+        if (statusInicial != StatusLocacao.ORCAMENTO && !temEntrega) {
+            locacao.setEstoqueDescontado(true);
+        }
+
         // Gera número sequencial antes de salvar
         long numeroLocacao = locacaoRepository.count() + 1;
         locacao.setNumero(numeroLocacao);
@@ -158,6 +166,7 @@ public class LocacaoService {
         return toResponse(locacaoSalva);
     }
 
+    @Transactional
     public List<LocacaoResponse> listarTodas(){
         // Próxima parcela PENDENTE por locação (parceladas com pagamento em aberto)
         Map<String, ParcelaResponse> proximaPendente = new HashMap<>();
@@ -294,10 +303,13 @@ public class LocacaoService {
             throw new IllegalArgumentException("Locação não pode ser devolvida no status atual");
         }
 
-        for (ItemLocacao item : locacao.getItens()){
-            Produto produto = item.getProduto();
-            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
-            produtoRepository.save(produto);
+        // Só restaura estoque se ele foi de fato baixado
+        if (locacao.isEstoqueDescontado()) {
+            for (ItemLocacao item : locacao.getItens()){
+                Produto produto = item.getProduto();
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                produtoRepository.save(produto);
+            }
         }
 
         lancamentoRepository.findByLocacaoId(id).forEach(l -> {
@@ -318,8 +330,8 @@ public class LocacaoService {
         Locacao locacao = locacaoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Locação não encontrada"));
 
-        // Restaura estoque se ainda estava em uso
-        if (locacao.getStatus() == StatusLocacao.ATIVA || locacao.getStatus() == StatusLocacao.ATRASADA) {
+        // Restaura estoque somente se ele foi de fato baixado
+        if (locacao.isEstoqueDescontado()) {
             for (ItemLocacao item : locacao.getItens()) {
                 Produto produto = item.getProduto();
                 produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
@@ -342,8 +354,7 @@ public class LocacaoService {
             throw new IllegalArgumentException("A locação já está cancelada");
         }
 
-        if (locacao.getStatus() == StatusLocacao.ATIVA || locacao.getStatus() == StatusLocacao.ATRASADA) {
-
+        if (locacao.isEstoqueDescontado()) {
             for (ItemLocacao item : locacao.getItens()) {
                 Produto produto = item.getProduto();
                 produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
@@ -393,14 +404,18 @@ public class LocacaoService {
             throw new IllegalArgumentException("Apenas orçamentos podem ser confirmados");
         }
 
-        // Reserva estoque
-        for (ItemLocacao item : locacao.getItens()) {
-            Produto produto = item.getProduto();
-            if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
-                throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
+        // Só desconta estoque se não houver entrega (retirada no local)
+        boolean temEntregaConfirmar = locacao.getEntrega() != null;
+        if (!temEntregaConfirmar) {
+            for (ItemLocacao item : locacao.getItens()) {
+                Produto produto = item.getProduto();
+                if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
+                    throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
+                }
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
+                produtoRepository.save(produto);
             }
-            produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
-            produtoRepository.save(produto);
+            locacao.setEstoqueDescontado(true);
         }
 
         // Cria lançamento PENDENTE (confirmado na devolução)

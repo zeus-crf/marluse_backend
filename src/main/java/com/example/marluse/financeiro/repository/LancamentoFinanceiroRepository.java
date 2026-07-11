@@ -102,17 +102,15 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
     """)
     List<LancamentoFinanceiro> findUltimasParcelasDePedidosPagos();
 
-    @Query("SELECT l FROM LancamentoFinanceiro l " +
-            "WHERE l.locacao IS NOT NULL " +
-            "AND l.totalParcelas > 1 " +
+    @Query("SELECT l FROM LancamentoFinanceiro l JOIN FETCH l.locacao " +
+            "WHERE l.totalParcelas > 1 " +
             "AND l.status = 'PENDENTE' " +
             "ORDER BY l.dataVencimento ASC NULLS LAST")
     List<LancamentoFinanceiro> findProximasParcelasPendentesLocacoes();
 
     @Query("""
-        SELECT l FROM LancamentoFinanceiro l
-        WHERE l.locacao IS NOT NULL
-        AND l.totalParcelas > 1
+        SELECT l FROM LancamentoFinanceiro l JOIN FETCH l.locacao
+        WHERE l.totalParcelas > 1
         AND l.status = 'PAGO'
         AND NOT EXISTS (
             SELECT 1 FROM LancamentoFinanceiro l2

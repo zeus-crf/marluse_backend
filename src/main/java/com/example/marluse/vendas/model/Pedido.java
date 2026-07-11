@@ -75,4 +75,9 @@ public class Pedido extends BaseEntity {
 
     @Column(name = "data_movimento")
     private LocalDate dataMovimento;
+
+    /** true quando o estoque já foi baixado (imediatamente se sem entrega; ao confirmar entrega se tiver entrega) */
+    @Builder.Default
+    @Column(name = "estoque_descontado", nullable = false)
+    private boolean estoqueDescontado = false;
 }
