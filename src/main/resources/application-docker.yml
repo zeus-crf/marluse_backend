@@ -15,6 +15,13 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+    properties:
+      hibernate:
+        # Agrupa carregamentos lazy: em vez de 1 query por registro (N+1),
+        # o Hibernate busca até 25 de uma vez com WHERE id IN (...).
+        # ESTE arquivo é o único de config que vai para produção (Railway),
+        # pois application.yml está no .gitignore.
+        default_batch_fetch_size: 25
 
 security:
   jwt:

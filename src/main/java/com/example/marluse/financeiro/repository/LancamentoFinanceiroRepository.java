@@ -47,6 +47,36 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'DESPESA' AND l.status = 'PAGO' AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarDespesaPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
+    // ── Agregações mensais para relatórios (GROUP BY no banco, sem carregar entidades) ──
+    // Retornam pares [ '%Y-%m', SUM(valor) ].
+
+    @Query("""
+        SELECT FUNCTION('DATE_FORMAT', l.dataPagamento, '%Y-%m'), COALESCE(SUM(l.valor), 0)
+        FROM LancamentoFinanceiro l
+        WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.pedido IS NOT NULL
+        AND l.dataPagamento BETWEEN :inicio AND :fim
+        GROUP BY FUNCTION('DATE_FORMAT', l.dataPagamento, '%Y-%m')
+    """)
+    List<Object[]> receitaVendasPorMes(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    @Query("""
+        SELECT FUNCTION('DATE_FORMAT', l.dataPagamento, '%Y-%m'), COALESCE(SUM(l.valor), 0)
+        FROM LancamentoFinanceiro l
+        WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.locacao IS NOT NULL
+        AND l.dataPagamento BETWEEN :inicio AND :fim
+        GROUP BY FUNCTION('DATE_FORMAT', l.dataPagamento, '%Y-%m')
+    """)
+    List<Object[]> receitaLocacoesPorMes(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
+    @Query("""
+        SELECT FUNCTION('DATE_FORMAT', l.dataPagamento, '%Y-%m'), COALESCE(SUM(l.valor), 0)
+        FROM LancamentoFinanceiro l
+        WHERE l.tipo = 'DESPESA' AND l.status = 'PAGO'
+        AND l.dataPagamento BETWEEN :inicio AND :fim
+        GROUP BY FUNCTION('DATE_FORMAT', l.dataPagamento, '%Y-%m')
+    """)
+    List<Object[]> despesaPorMes(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
+
     @Query("""
     SELECT l FROM LancamentoFinanceiro l
     WHERE l.recorrencia IS NOT NULL

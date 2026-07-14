@@ -73,7 +73,7 @@ public class Locacao extends BaseEntity {
     private LocalDate jurosAplicadoEm;
 
     @Builder.Default
-    @OneToMany(mappedBy = "locacao", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "locacao", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<ItemLocacao> itens = new ArrayList<>();
 
     @OneToOne(mappedBy = "locacao", cascade = CascadeType.ALL, optional = true)

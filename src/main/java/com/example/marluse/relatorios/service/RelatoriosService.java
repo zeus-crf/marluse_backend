@@ -2,8 +2,6 @@
 package com.example.marluse.relatorios.service;
 
 import com.example.marluse.financeiro.enums.StatusLancamento;
-import com.example.marluse.financeiro.enums.TipoLancamento;
-import com.example.marluse.financeiro.model.LancamentoFinanceiro;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.relatorios.dto.*;
 import com.example.marluse.vendas.enums.StatusPedido;
@@ -88,36 +86,15 @@ public class RelatoriosService {
         LocalDate hoje  = LocalDate.now();
         LocalDate inicio = hoje.minusMonths(meses).withDayOfMonth(1);
 
-        List<LancamentoFinanceiro> receitas = lancamentoRepository
-                .findByTipoAndStatusAndDataPagamentoBetween(TipoLancamento.RECEITA, StatusLancamento.PAGO, inicio, hoje);
-        List<LancamentoFinanceiro> despesas = lancamentoRepository
-                .findByTipoAndStatusAndDataPagamentoBetween(TipoLancamento.DESPESA, StatusLancamento.PAGO, inicio, hoje);
-
-        Map<YearMonth, BigDecimal> vendasMap = receitas.stream()
-                .filter(l -> l.getPedido() != null)
-                .collect(Collectors.groupingBy(
-                        l -> YearMonth.from(l.getDataPagamento()),
-                        Collectors.reducing(BigDecimal.ZERO, LancamentoFinanceiro::getValor, BigDecimal::add)));
-
-        Map<YearMonth, BigDecimal> locacoesMap = receitas.stream()
-                .filter(l -> l.getLocacao() != null)
-                .collect(Collectors.groupingBy(
-                        l -> YearMonth.from(l.getDataPagamento()),
-                        Collectors.reducing(BigDecimal.ZERO, LancamentoFinanceiro::getValor, BigDecimal::add)));
-
-        Map<YearMonth, BigDecimal> despesasMap = despesas.stream()
-                .collect(Collectors.groupingBy(
-                        l -> YearMonth.from(l.getDataPagamento()),
-                        Collectors.reducing(BigDecimal.ZERO, LancamentoFinanceiro::getValor, BigDecimal::add)));
+        // Agregação feita no banco (GROUP BY por mês).
+        // Antes: carregava TODOS os lançamentos do período como entidades e agrupava em Java.
+        Map<YearMonth, BigDecimal> vendasMap   = agruparPorMes(lancamentoRepository.receitaVendasPorMes(inicio, hoje));
+        Map<YearMonth, BigDecimal> locacoesMap = agruparPorMes(lancamentoRepository.receitaLocacoesPorMes(inicio, hoje));
+        Map<YearMonth, BigDecimal> despesasMap = agruparPorMes(lancamentoRepository.despesaPorMes(inicio, hoje));
 
         // CMV por mês — agrupa resultado da query em mapa YearMonth → valor
-        Map<YearMonth, BigDecimal> cmvMap = itemPedidoRepository
-                .cmvPorMes(inicio.atStartOfDay(), hoje.atTime(23, 59, 59))
-                .stream()
-                .collect(Collectors.toMap(
-                        r -> YearMonth.parse((String) r[0]),
-                        r -> (BigDecimal) r[1]
-                ));
+        Map<YearMonth, BigDecimal> cmvMap = agruparPorMes(
+                itemPedidoRepository.cmvPorMes(inicio.atStartOfDay(), hoje.atTime(23, 59, 59)));
 
         List<ReceitaMensalItemResponse> result = new ArrayList<>();
         YearMonth ym = YearMonth.from(inicio);
@@ -196,5 +173,13 @@ public class RelatoriosService {
                 .divide(anterior, 4, RoundingMode.HALF_UP)
                 .multiply(BigDecimal.valueOf(100))
                 .doubleValue();
+    }
+
+    /** Converte linhas [ '%Y-%m', SUM(valor) ] das queries agregadas em mapa YearMonth → valor. */
+    private static Map<YearMonth, BigDecimal> agruparPorMes(List<Object[]> rows) {
+        return rows.stream().collect(Collectors.toMap(
+                r -> YearMonth.parse((String) r[0]),
+                r -> (BigDecimal) r[1]
+        ));
     }
 }
