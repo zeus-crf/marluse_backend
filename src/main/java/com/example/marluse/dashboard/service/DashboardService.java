@@ -70,7 +70,7 @@ public class DashboardService {
                 .somarVendasAgrupadoPorDia(StatusPedido.CONFIRMADO, inicio, fim)
                 .stream()
                 .collect(Collectors.toMap(
-                        row -> ((java.sql.Date) row[0]).toLocalDate(),
+                        row -> (LocalDate) row[0],
                         row -> (BigDecimal) row[1]
                 ));
 
@@ -78,7 +78,7 @@ public class DashboardService {
                 .somarLocacoesAgrupadoPorDia(inicio, fim)
                 .stream()
                 .collect(Collectors.toMap(
-                        row -> ((java.sql.Date) row[0]).toLocalDate(),
+                        row -> (LocalDate) row[0],
                         row -> (BigDecimal) row[1]
                 ));
 
@@ -96,9 +96,11 @@ public class DashboardService {
     }
 
     public List<EstoqueCriticoResponse> getEstoqueCritico() {
-        return produtoRepository.findAll()
+        // Antes: findAll() trazia o catálogo inteiro para filtrar em Java.
+        // Agora usa a query findEstoqueBaixo() (WHERE quantidade <= minimo AND ativo)
+        // que já existe no repositório — só os produtos críticos vêm do banco.
+        return produtoRepository.findEstoqueBaixo()
                 .stream()
-                .filter(p -> p.getQuantidadeEstoque() <= p.getEstoqueMinimo())
                 .map(p -> new EstoqueCriticoResponse(
                         p.getId(),
                         p.getNome(),

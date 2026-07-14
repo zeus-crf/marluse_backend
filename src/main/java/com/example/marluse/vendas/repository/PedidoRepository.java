@@ -18,13 +18,13 @@ public interface PedidoRepository extends JpaRepository<Pedido, String> {
 
     @Query("SELECT COALESCE(SUM(p.valorTotal), 0) FROM Pedido p " +
             "WHERE p.status IN ('CONFIRMADO', 'PAGO') " +
-            "AND CAST(p.dataMovimento AS date) BETWEEN :inicio AND :fim")
+            "AND p.dataMovimento BETWEEN :inicio AND :fim")
     BigDecimal somarVendasPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
-    @Query("SELECT COUNT(p) FROM Pedido p WHERE p.status = :status AND CAST(p.dataMovimento AS date) BETWEEN :inicio AND :fim")
+    @Query("SELECT COUNT(p) FROM Pedido p WHERE p.status = :status AND p.dataMovimento BETWEEN :inicio AND :fim")
     long contarVendasPorPeriodo(@Param("status") StatusPedido status, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
-    @Query("SELECT CAST(p.dataMovimento AS date), COALESCE(SUM(p.valorTotal), 0) FROM Pedido p WHERE p.status = :status AND CAST(p.dataMovimento AS date) BETWEEN :inicio AND :fim GROUP BY CAST(p.dataMovimento AS date)")
+    @Query("SELECT p.dataMovimento, COALESCE(SUM(p.valorTotal), 0) FROM Pedido p WHERE p.status = :status AND p.dataMovimento BETWEEN :inicio AND :fim GROUP BY p.dataMovimento")
     List<Object[]> somarVendasAgrupadoPorDia(@Param("status") StatusPedido status, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
     @Query("SELECT p.cliente.id, COALESCE(SUM(p.valorTotal), 0) FROM Pedido p WHERE p.cliente IS NOT NULL AND p.status = 'PAGO' GROUP BY p.cliente.id")

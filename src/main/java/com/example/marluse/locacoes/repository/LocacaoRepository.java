@@ -24,13 +24,13 @@ public interface LocacaoRepository extends JpaRepository<Locacao, String> {
 
     List<Locacao> findByStatusAndDataDevolucaoPrevistaBefore(StatusLocacao status, LocalDate data);
 
-    @Query("SELECT COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE l.status IN (:statusList) AND CAST(l.dataMovimento AS date) BETWEEN :inicio AND :fim")
+    @Query("SELECT COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE l.status IN (:statusList) AND l.dataMovimento BETWEEN :inicio AND :fim")
     BigDecimal somarLocacoesPorPeriodo(@Param("statusList") List<StatusLocacao> statusList, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
     @Query("SELECT COUNT(l) FROM Locacao l WHERE l.status IN (:statusList)")
     long contarLocacoesAtivas(@Param("statusList") List<StatusLocacao> statusList);
 
-    @Query("SELECT CAST(l.dataMovimento AS date), COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE CAST(l.dataMovimento AS date) BETWEEN :inicio AND :fim GROUP BY CAST(l.dataMovimento AS date)")
+    @Query("SELECT l.dataMovimento, COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE l.dataMovimento BETWEEN :inicio AND :fim GROUP BY l.dataMovimento")
     List<Object[]> somarLocacoesAgrupadoPorDia(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
     @Query("SELECT l.cliente.id, COALESCE(SUM(l.valorTotal), 0) FROM Locacao l WHERE l.cliente IS NOT NULL AND l.status = 'DEVOLVIDA' GROUP BY l.cliente.id")
