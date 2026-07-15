@@ -105,7 +105,13 @@ public class LocacaoService {
                 produtoRepository.save(produto);
             }
 
-            BigDecimal subtotal = produto.getPreco()
+            BigDecimal diaria = itemRequest.precoDiaria() != null
+                    ? itemRequest.precoDiaria()
+                    : (produto.getPrecoDiaria() !=  null ?
+                    produto.getPrecoDiaria() : produto.getPreco());
+
+
+            BigDecimal subtotal = diaria
                     .multiply(BigDecimal.valueOf(itemRequest.quantidade()))
                     .multiply(BigDecimal.valueOf(dias));
 
@@ -114,6 +120,7 @@ public class LocacaoService {
                     .produto(produto)
                     .quantidade(itemRequest.quantidade())
                     .precoDiaria(produto.getPreco())
+                    .precoDiaria(diaria)
                     .subtotal(subtotal)
                     .build();
 
