@@ -150,11 +150,6 @@ public class PedidoService {
         long numeroPedido = pedidoRepository.count() + 1;
         pedido.setNumero(numeroPedido);
 
-        // Marca que o estoque foi baixado imediatamente (retirada no local, sem entrega)
-        if (statusInicial != StatusPedido.ORCAMENTO && !temEntrega) {
-            pedido.setEstoqueDescontado(true);
-        }
-
         Pedido pedidoSalvo = pedidoRepository.save(pedido);
 
         // Orçamento não gera lançamento financeiro

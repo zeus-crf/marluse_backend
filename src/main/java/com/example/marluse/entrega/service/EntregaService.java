@@ -34,36 +34,46 @@ public class EntregaService {
         var entrega = entregaRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Entrega não encontrada"));
 
-        // Se a entrega está vinculada a um pedido cujo estoque ainda não foi descontado,
-        // desconta agora (pedidos com entrega só baixam estoque na confirmação da entrega)
+        // Pedidos com entrega só baixam estoque na confirmação da entrega — por item,
+        // respeitando o flag baixarEstoque e permitindo saldo negativo quando autorizado.
         Pedido pedido = entrega.getPedido();
-        if (pedido != null && !pedido.isEstoqueDescontado()) {
+        if (pedido != null) {
             for (ItemPedido item : pedido.getItens()) {
-                Produto produto = item.getProduto();
-                if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
-                    throw new IllegalArgumentException(
-                            "Estoque insuficiente para entregar: " + produto.getNome());
+                if (item.isBaixar_estoque() && !item.isEstoqueDescontado()) {
+                    Produto produto = item.getProduto();
+                    int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
+                    if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+                        throw new IllegalArgumentException(
+                                "Estoque insuficiente para entregar: " + produto.getNome());
+                    }
+                    produto.setQuantidadeEstoque(novoSaldo);
+                    produtoRepository.save(produto);
+                    item.setEstoqueDescontado(true);
                 }
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
-                produtoRepository.save(produto);
             }
-            pedido.setEstoqueDescontado(true);
+            pedido.setEstoqueDescontado(
+                    pedido.getItens().stream().anyMatch(ItemPedido::isEstoqueDescontado));
             pedidoRepository.save(pedido);
         }
 
-        // Desconta estoque da locação vinculada (se ainda não foi descontado)
+        // Idem para a locação vinculada.
         Locacao locacao = entrega.getLocacao();
-        if (locacao != null && !locacao.isEstoqueDescontado()) {
+        if (locacao != null) {
             for (ItemLocacao item : locacao.getItens()) {
-                Produto produto = item.getProduto();
-                if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
-                    throw new IllegalArgumentException(
-                            "Estoque insuficiente para entregar: " + produto.getNome());
+                if (item.isBaixar_estoque() && !item.isEstoqueDescontado()) {
+                    Produto produto = item.getProduto();
+                    int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
+                    if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+                        throw new IllegalArgumentException(
+                                "Estoque insuficiente para entregar: " + produto.getNome());
+                    }
+                    produto.setQuantidadeEstoque(novoSaldo);
+                    produtoRepository.save(produto);
+                    item.setEstoqueDescontado(true);
                 }
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
-                produtoRepository.save(produto);
             }
-            locacao.setEstoqueDescontado(true);
+            locacao.setEstoqueDescontado(
+                    locacao.getItens().stream().anyMatch(ItemLocacao::isEstoqueDescontado));
             locacaoRepository.save(locacao);
         }
 

@@ -145,13 +145,6 @@ public class LocacaoService {
 
         locacao.setValorTotal(valorFinal);
 
-
-
-        // Marca que o estoque foi baixado imediatamente (retirada no local, sem entrega)
-        if (statusInicial != StatusLocacao.ORCAMENTO && !temEntrega) {
-            locacao.setEstoqueDescontado(true);
-        }
-
         // Gera número sequencial antes de salvar
         long numeroLocacao = locacaoRepository.count() + 1;
         locacao.setNumero(numeroLocacao);
