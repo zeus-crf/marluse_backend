@@ -1,5 +1,6 @@
 package com.example.marluse.estoque.service;
 
+import com.example.marluse.estoque.dto.CategoriaProduto;
 import com.example.marluse.estoque.dto.ProdutoAtualizarRequest;
 import com.example.marluse.estoque.dto.ProdutoRequest;
 import com.example.marluse.estoque.dto.ProdutoResponse;
@@ -27,11 +28,13 @@ public class ProdutoService {
                 .nome(request.nome())
                 .descricao(request.descricao())
                 .preco(request.preco())
+                .precoDiaria(request.precoDiaria() != null ? request.precoDiaria() : request.preco())
                 .valorCompra(request.valorCompra())
                 .quantidadeEstoque(request.quantidadeEstoque() != null ? request.quantidadeEstoque() : 0)
                 .estoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0)
                 .ativo(true)
                 .medida(request.medida())
+                .categoria(request.categoria() != null ? request.categoria() : CategoriaProduto.OUTROS)
                 .build();
 
         return ProdutoResponse.from(produtoRepository.save(produto));
@@ -59,8 +62,11 @@ public class ProdutoService {
         if (request.descricao() != null) produto.setDescricao(request.descricao());
         if (request.valorCompra() != null) produto.setValorCompra(request.valorCompra());
         if (request.preco() != null) produto.setPreco(request.preco());
+        if (request.precoDiaria() != null) produto.setPrecoDiaria(request.precoDiaria());
         if (request.medida() != null) produto.setMedida(request.medida());
         if (request.quantidadeEstoque() != null) produto.setQuantidadeEstoque(request.quantidadeEstoque());
+        if (request.categoria() != null ) produto.setCategoria(request.categoria());
+
         produto.setEstoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0);
 
         return ProdutoResponse.from(produtoRepository.save(produto));
