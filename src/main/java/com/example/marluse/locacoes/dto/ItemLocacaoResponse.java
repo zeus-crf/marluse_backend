@@ -10,7 +10,9 @@ public record ItemLocacaoResponse(
         String produtoNome,
         Integer quantidade,
         BigDecimal precoDiaria,
-        BigDecimal subtotal
+        BigDecimal subtotal,
+        boolean baixarEstoque,
+        boolean permitirSemEstoque
 ) {
     public static ItemLocacaoResponse from(ItemLocacao item) {
         return new ItemLocacaoResponse(
@@ -19,7 +21,9 @@ public record ItemLocacaoResponse(
                 item.getProduto().getNome(),
                 item.getQuantidade(),
                 item.getPrecoDiaria(),
-                item.getSubtotal()
+                item.getSubtotal(),
+                item.isBaixar_estoque(),
+                item.isEstoqueDescontado()
         );
     }
 }

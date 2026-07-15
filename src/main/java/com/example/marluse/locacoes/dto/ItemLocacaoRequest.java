@@ -13,6 +13,10 @@ public record ItemLocacaoRequest (
         @Min(value = 1, message = "Quantidade deve ser maior que zero")
         Integer quantidade,
 
-        BigDecimal precoDiaria
+        BigDecimal precoDiaria,
+
+        boolean baixarEstoque,
+
+        boolean permitirBaixarEstoque
 ) {
 }

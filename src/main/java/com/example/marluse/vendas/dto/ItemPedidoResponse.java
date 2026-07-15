@@ -10,16 +10,20 @@ public record ItemPedidoResponse(
         String produtoNome,
         Integer quantidade,
         BigDecimal precoUnitario,
-        BigDecimal subtotal
+        BigDecimal subtotal,
+        boolean baixarEstoque,
+        boolean permitirSemEstoque
 ) {
-    public static ItemPedidoResponse from(ItemPedido item) {
+    public static ItemPedidoResponse from(ItemPedido item) {git
         return new ItemPedidoResponse(
                 item.getId(),
                 item.getProduto().getId(),
                 item.getProduto().getNome(),
                 item.getQuantidade(),
                 item.getPrecoUnitario(),
-                item.getSubTotal()
+                item.getSubTotal(),
+                item.isBaixar_estoque(),
+                item.isPermitirSemEstoque()
         );
     }
 }

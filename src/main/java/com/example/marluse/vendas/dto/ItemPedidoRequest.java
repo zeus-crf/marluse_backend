@@ -13,6 +13,10 @@ public record ItemPedidoRequest(
         @Min(value = 1, message = "A Quantidade deve ser maior que zero")
         Integer quantidade,
 
-        BigDecimal preco
+        BigDecimal preco,
+
+        boolean baixarEstoque,
+
+        boolean permitirSemEstoque
 ) {
 }
