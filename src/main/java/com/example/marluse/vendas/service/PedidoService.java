@@ -111,14 +111,19 @@ public class PedidoService {
                 produtoRepository.save(produto);
             }
 
-            BigDecimal subTotal = produto.getPreco().multiply(BigDecimal.valueOf(itemRequest.quantidade()));
+            BigDecimal precoVenda = itemRequest.preco() != null
+                    ? itemRequest.preco()
+                    : produto.getPreco();
+
+            BigDecimal subTotal = precoVenda.multiply(BigDecimal.valueOf(itemRequest.quantidade()));
 
             ItemPedido item = ItemPedido.builder()
                     .pedido(pedido)
                     .produto(produto)
                     .quantidade(itemRequest.quantidade())
                     .custoUnitario(produto.getValorCompra())
-                    .precoUnitario(produto.getPreco())
+                    .precoUnitario(precoVenda
+                    )
                     .subTotal(subTotal)
                     .build();
 

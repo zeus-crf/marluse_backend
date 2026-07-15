@@ -19,9 +19,12 @@ public record ProdutoRequest(
         @DecimalMin(value = "0.0", inclusive = false, message = "O Preço deve ser maior que 0")
         BigDecimal valorCompra,
 
-        @NotNull(message = "Preço é obrigatório")
+
         @DecimalMin(value = "0.0", inclusive = false, message = "Preço deve ser maior que zero")
         BigDecimal preco,
+
+        @DecimalMin(value = "0.0", inclusive = false, message = "Preço da diária deve ser maior que zero")
+        BigDecimal precoDiaria,
 
         @Min(value = 0, message = "Quantidade não pode ser negativa")
         Integer quantidadeEstoque,
@@ -30,6 +33,9 @@ public record ProdutoRequest(
         Integer estoqueMinimo,
 
         @NotNull(message = "Unidade de medida é obrigatória")
-        UnidadeMedida medida
+        UnidadeMedida medida,
+
+        @NotNull(message = "Categoria é obrigatória")
+        CategoriaProduto categoria
 ) {
 }

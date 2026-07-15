@@ -14,8 +14,10 @@ public record ProdutoAtualizarRequest(
         String descricao,
         BigDecimal valorCompra,
         BigDecimal preco,
+        BigDecimal precoDiaria,
         Integer quantidadeEstoque,
         Integer estoqueMinimo,
-        UnidadeMedida medida
+        UnidadeMedida medida,
+        CategoriaProduto categoria
 ) {
 }
