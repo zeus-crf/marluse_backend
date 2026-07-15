@@ -23,7 +23,7 @@ public record ItemLocacaoResponse(
                 item.getPrecoDiaria(),
                 item.getSubtotal(),
                 item.isBaixar_estoque(),
-                item.isEstoqueDescontado()
+                item.isPermitirSemEstoque()
         );
     }
 }
