@@ -11,11 +11,13 @@ public record ProdutoResponse(
         String descricao,
         BigDecimal valorCompra,
         BigDecimal preco,
+        BigDecimal precoDiaria,
         Integer quantidadeEstoque,
         Integer estoqueMinimo,
         boolean ativo,
         boolean estoqueBaixo,
-        UnidadeMedida medida
+        UnidadeMedida medida,
+        CategoriaProduto categoria
 ) {
     public static ProdutoResponse from(Produto produto){
         return new ProdutoResponse(
@@ -24,11 +26,13 @@ public record ProdutoResponse(
                 produto.getDescricao(),
                 produto.getValorCompra(),
                 produto.getPreco(),
+                produto.getPrecoDiaria(),
                 produto.getQuantidadeEstoque(),
                 produto.getEstoqueMinimo(),
                 produto.isAtivo(),
                 produto.getQuantidadeEstoque() <= produto.getEstoqueMinimo(),
-                produto.getMedida()
+                produto.getMedida(),
+                produto.getCategoria()
         );
     }
 }
