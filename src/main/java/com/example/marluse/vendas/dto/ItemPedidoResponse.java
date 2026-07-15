@@ -14,7 +14,7 @@ public record ItemPedidoResponse(
         boolean baixarEstoque,
         boolean permitirSemEstoque
 ) {
-    public static ItemPedidoResponse from(ItemPedido item) {git
+    public static ItemPedidoResponse from(ItemPedido item) {
         return new ItemPedidoResponse(
                 item.getId(),
                 item.getProduto().getId(),

@@ -96,14 +96,8 @@ public class LocacaoService {
             Produto produto = produtoRepository.findById(itemRequest.produtoId())
                     .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
 
-            // Orçamento nunca baixa estoque; locação com entrega aguarda confirmação da entrega
-            if (statusInicial != StatusLocacao.ORCAMENTO && !temEntrega) {
-                if (produto.getQuantidadeEstoque() < itemRequest.quantidade()){
-                    throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
-                }
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
-                produtoRepository.save(produto);
-            }
+            boolean baixar =  itemRequest.baixarEstoque();
+            boolean permitir = Boolean.TRUE.equals(itemRequest.permitirSemEstoque());
 
             BigDecimal diaria = itemRequest.precoDiaria() != null
                     ? itemRequest.precoDiaria()
@@ -122,11 +116,21 @@ public class LocacaoService {
                     .precoDiaria(produto.getPreco())
                     .precoDiaria(diaria)
                     .subtotal(subtotal)
+                    .baixar_estoque(baixar)
+                    .permitirSemEstoque(permitir)
                     .build();
+
+            // Orçamento nunca baixa; com entrega, baixa só na confirmação da entrega
+            if (statusInicial != StatusLocacao.ORCAMENTO && !temEntrega && baixar) {
+                baixarEstoque(item);
+            }
 
             locacao.getItens().add(item);
             total = total.add(subtotal);
         }
+
+        locacao.setEstoqueDescontado(
+                locacao.getItens().stream().anyMatch(ItemLocacao::isEstoqueDescontado));
 
 
         locacao.setDesconto(request.desconto());
@@ -311,11 +315,12 @@ public class LocacaoService {
         }
 
         // Só restaura estoque se ele foi de fato baixado
-        if (locacao.isEstoqueDescontado()) {
-            for (ItemLocacao item : locacao.getItens()){
+        for (ItemLocacao item : locacao.getItens()) {
+            if (item.isEstoqueDescontado()) {
                 Produto produto = item.getProduto();
                 produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
                 produtoRepository.save(produto);
+                item.setEstoqueDescontado(false);
             }
         }
 
@@ -415,14 +420,15 @@ public class LocacaoService {
         boolean temEntregaConfirmar = locacao.getEntrega() != null;
         if (!temEntregaConfirmar) {
             for (ItemLocacao item : locacao.getItens()) {
-                Produto produto = item.getProduto();
-                if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
-                    throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
-                }
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
-                produtoRepository.save(produto);
+              if (item.isBaixar_estoque() && !item.isEstoqueDescontado()){
+                  baixarEstoque(item);
+              }
             }
-            locacao.setEstoqueDescontado(true);
+            locacao.setEstoqueDescontado(
+                    locacao.getItens()
+                            .stream()
+                            .anyMatch(ItemLocacao::isEstoqueDescontado)
+            );
         }
 
         // Cria lançamento PENDENTE (confirmado na devolução)
@@ -445,6 +451,17 @@ public class LocacaoService {
 
     public BigDecimal somarLocacoesPorPeriodo(LocalDate inicio, LocalDate fim) {
         return lancamentoRepository.somarReceitaLocacoesPorPagamento(inicio, fim);
+    }
+
+    private void baixarEstoque(ItemLocacao item) {
+        Produto produto = item.getProduto();
+        int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
+        if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+            throw new IllegalArgumentException("Estoque insuficiente para" + produto.getNome());
+        }
+        produto.setQuantidadeEstoque(novoSaldo);
+        produtoRepository.save(produto);
+        item.setEstoqueDescontado(true);
     }
 
     private LocacaoResponse toResponse(Locacao locacao) {

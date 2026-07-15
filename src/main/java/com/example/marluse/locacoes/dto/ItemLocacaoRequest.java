@@ -17,6 +17,6 @@ public record ItemLocacaoRequest (
 
         boolean baixarEstoque,
 
-        boolean permitirBaixarEstoque
+        boolean permitirSemEstoque
 ) {
 }
