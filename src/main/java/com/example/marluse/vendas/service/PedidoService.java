@@ -101,15 +101,8 @@ public class PedidoService {
             Produto produto = produtoRepository.findById(itemRequest.productId())
                     .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
 
-            // Orçamento nunca baixa estoque; pedido com entrega aguarda confirmação da entrega
-            if (statusInicial != StatusPedido.ORCAMENTO && !temEntrega) {
-                if (produto.getQuantidadeEstoque() < itemRequest.quantidade()) {
-                    throw new IllegalArgumentException("Estoque insuficiente: " + produto.getNome());
-                }
-
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - itemRequest.quantidade());
-                produtoRepository.save(produto);
-            }
+        boolean baixar = itemRequest.baixarEstoque();
+        boolean permitir = Boolean.TRUE.equals(itemRequest.permitirSemEstoque());
 
             BigDecimal precoVenda = itemRequest.preco() != null
                     ? itemRequest.preco()
@@ -125,11 +118,21 @@ public class PedidoService {
                     .precoUnitario(precoVenda
                     )
                     .subTotal(subTotal)
+                    .baixar_estoque(baixar)
+                    .permitirSemEstoque(permitir)
                     .build();
+
+            if  (statusInicial != StatusPedido.ORCAMENTO && !temEntrega && baixar) {
+                baixarEstoque(item);
+            }
 
             pedido.getItens().add(item);
             total = total.add(subTotal);
         }
+
+        pedido.setEstoqueDescontado(
+                pedido.getItens().stream().anyMatch(ItemPedido::isEstoqueDescontado));
+
 
         pedido.setDesconto(request.desconto());
         pedido.setTipoDesconto(request.tipoDesconto());
@@ -274,9 +277,12 @@ public class PedidoService {
         // (pedidos com entrega pendente ainda não baixaram o estoque)
         if (pedido.isEstoqueDescontado()) {
             for (ItemPedido item : pedido.getItens()) {
-                Produto produto = item.getProduto();
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
-                produtoRepository.save(produto);
+                if (item.isEstoqueDescontado()) {
+                    Produto produto = item.getProduto();
+                    produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                    produtoRepository.save(produto);
+                    item.setEstoqueDescontado(false);
+                }
             }
         }
 
@@ -395,21 +401,14 @@ public class PedidoService {
         // Faz snapshot do custo e, se não houver entrega, desconta estoque imediatamente
         boolean temEntregaConfirmar = pedido.getEntrega() != null;
         for (ItemPedido item : pedido.getItens()) {
-            Produto produto = item.getProduto();
-
-            if (!temEntregaConfirmar) {
-                if (produto.getQuantidadeEstoque() < item.getQuantidade()) {
-                    throw new IllegalArgumentException("Estoque insuficiente para: " + produto.getNome());
-                }
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() - item.getQuantidade());
-                produtoRepository.save(produto);
+            if (!temEntregaConfirmar && item.isBaixar_estoque() && !item.isEstoqueDescontado()) {
+                baixarEstoque(item);
             }
-
-            // Registra o custo de compra vigente no momento da confirmação
-            item.setCustoUnitario(produto.getValorCompra());
+            item.setCustoUnitario(item.getProduto().getValorCompra());
         }
         if (!temEntregaConfirmar) {
-            pedido.setEstoqueDescontado(true);
+            pedido.setEstoqueDescontado(
+                    pedido.getItens().stream().anyMatch(ItemPedido::isEstoqueDescontado));
         }
 
         // Gera lançamento financeiro
@@ -432,6 +431,17 @@ public class PedidoService {
         Pedido pedido = buscarEntidade(id);
         lancamentoRepository.deleteAll(lancamentoRepository.findByPedidoId(id));
         pedidoRepository.delete(pedido);
+    }
+
+    private void baixarEstoque(ItemPedido item) {
+        Produto produto = item.getProduto();
+        int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
+        if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+            throw new IllegalArgumentException("Estoque insuficiente: " + produto.getNome());
+        }
+        produto.setQuantidadeEstoque(novoSaldo);
+        produtoRepository.save(produto);
+        item.setEstoqueDescontado(true);
     }
 
     private Pedido buscarEntidade(String id) {
