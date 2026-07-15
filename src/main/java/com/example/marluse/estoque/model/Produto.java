@@ -1,5 +1,6 @@
 package com.example.marluse.estoque.model;
 
+import com.example.marluse.estoque.dto.CategoriaProduto;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.shared.BaseEntity;
 import jakarta.persistence.*;
@@ -27,6 +28,9 @@ public class Produto extends BaseEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal preco;
 
+    @Column(name = "preco_diaria", precision = 10, scale = 2)
+    private BigDecimal precoDiaria;
+
     @Builder.Default
     @Column(name = "quantidade_estoque", nullable = false)
     private Integer quantidadeEstoque = 0;
@@ -42,5 +46,9 @@ public class Produto extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     UnidadeMedida medida;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "categoria", length = 50)
+    private CategoriaProduto categoria;
 
 }
