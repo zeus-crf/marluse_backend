@@ -36,4 +36,16 @@ public class ItemPedido extends BaseEntity {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subTotal;
+
+    @Builder.Default
+    @Column(name = "baixar_estoque", nullable = false)
+    private boolean baixar_estoque = true;
+
+    @Builder.Default
+    @Column(name = "permitir_sem_estoque", nullable = false)
+    private boolean permitirSemEstoque = false;
+
+    @Builder.Default
+    @Column(name = "estoque_descontado", nullable = false)
+    private boolean estoqueDescontado = false;
 }
