@@ -31,6 +31,11 @@ public class ProdutoController {
         return ResponseEntity.ok(ApiResponse.ok(produtoService.listar()));
     }
 
+    @GetMapping("/rascunhos")
+    public ResponseEntity<ApiResponse<List<ProdutoResponse>>> listarRascunhos() {
+        return ResponseEntity.ok(ApiResponse.ok(produtoService.listarRascunho()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProdutoResponse>> listarPorId(@PathVariable String id){
         return ResponseEntity.ok(ApiResponse.ok(produtoService.burcarPorId(id)));
