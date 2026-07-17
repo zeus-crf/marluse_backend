@@ -6,8 +6,10 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record ItemLocacaoRequest (
-        @NotNull(message = "Produto é obrigatório")
+
         String produtoId,
+
+        String produtoNome,
 
         @NotNull(message = "Quantidade é obrigatória")
         @Min(value = 1, message = "Quantidade deve ser maior que zero")
@@ -19,4 +21,9 @@ public record ItemLocacaoRequest (
 
         boolean permitirSemEstoque
 ) {
+
+    private boolean isProdutoNovo() {
+        return (produtoId == null || produtoId.isBlank())
+                    && (produtoNome != null || !produtoNome.isBlank());
+    }
 }
