@@ -22,7 +22,7 @@ public record ItemLocacaoRequest (
         boolean permitirSemEstoque
 ) {
 
-    private boolean isProdutoNovo() {
+    public boolean isProdutoNovo() {
         return (produtoId == null || produtoId.isBlank())
                     && (produtoNome != null || !produtoNome.isBlank());
     }

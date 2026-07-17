@@ -6,6 +6,7 @@ import com.example.marluse.entrega.enums.StatusEntrega;
 import com.example.marluse.entrega.model.Entrega;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
+import com.example.marluse.estoque.service.ProdutoService;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.model.LancamentoFinanceiro;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
@@ -48,6 +49,8 @@ public class PedidoService {
 
     private final LancamentoFinanceiroService lancamentoService;
     private final LancamentoFinanceiroRepository lancamentoRepository;
+    private final ProdutoService produtoService;
+
     @Transactional
     public PedidoResponse criar (PedidoRequest request) {
 
@@ -98,8 +101,15 @@ public class PedidoService {
         boolean temEntrega = request.entrega() != null;
 
         for (ItemPedidoRequest itemRequest : request.itens()) {
-            Produto produto = produtoRepository.findById(itemRequest.productId())
-                    .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
+            Produto produto;
+            if (itemRequest.isProdutoNovo()){
+                produtoService.criarRascunho(itemRequest.produtoNome(), itemRequest.preco(), itemRequest.preco());
+            } else if (itemRequest.productId() != null && !itemRequest.productId().isBlank()){
+                produto = produtoRepository.findById(itemRequest.productId())
+                        .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
+            } else {
+                throw new  IllegalArgumentException("Item inválido: informe um produto existente ou o nome de um produto novo");
+            }
 
         boolean baixar = itemRequest.baixarEstoque();
         boolean permitir = Boolean.TRUE.equals(itemRequest.permitirSemEstoque());
