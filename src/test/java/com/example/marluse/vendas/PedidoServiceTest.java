@@ -62,6 +62,7 @@ class PedidoServiceTest {
         produto = produtoRepository.save(Produto.builder()
                 .nome("Cimento")
                 .preco(new BigDecimal("35.90"))
+                .valorCompra(new BigDecimal("20.00"))
                 .quantidadeEstoque(50)
                 .estoqueMinimo(5)
                 .medida(UnidadeMedida.SACO)
@@ -76,14 +77,24 @@ class PedidoServiceTest {
                 .build());
     }
 
+    /** Item com produto existente, baixando estoque (comportamento padrão dos testes). */
+    private ItemPedidoRequest item(String produtoId, int quantidade) {
+        return new ItemPedidoRequest(produtoId, null, quantidade, null, true, false);
+    }
+
+    /** PedidoRequest mínimo: apenas os campos essenciais, o resto null. */
+    private PedidoRequest pedidoRequest(String clienteId, FormaPagamento forma,
+                                        List<ItemPedidoRequest> itens, String observacao) {
+        return new PedidoRequest(
+                clienteId, forma, itens, observacao,
+                null, null, null, null, null, null, null, null, null, null);
+    }
+
     @Test
     void deveCriarLancamentoPagoAoCriarPedidoComPagamentoImediato() {
-        PedidoRequest request = new PedidoRequest(
-                cliente.getId(),
-                FormaPagamento.PIX,
-                List.of(new ItemPedidoRequest(produto.getId(), 2)),
-                null
-        );
+        PedidoRequest request = pedidoRequest(
+                cliente.getId(), FormaPagamento.PIX,
+                List.of(item(produto.getId(), 2)), null);
 
         PedidoResponse pedido = pedidoService.criar(request);
 
@@ -100,12 +111,9 @@ class PedidoServiceTest {
 
     @Test
     void deveCriarLancamentoPendenteAoCriarPedidoFiado() {
-        PedidoRequest request = new PedidoRequest(
-                cliente.getId(),
-                FormaPagamento.FIADO,
-                List.of(new ItemPedidoRequest(produto.getId(), 2)),
-                null  // observacao
-        );
+        PedidoRequest request = pedidoRequest(
+                cliente.getId(), FormaPagamento.FIADO,
+                List.of(item(produto.getId(), 2)), null);
 
         PedidoResponse pedido = pedidoService.criar(request);
 
@@ -117,31 +125,26 @@ class PedidoServiceTest {
         assertEquals(LocalDate.now().plusDays(30), lancamento.getDataVencimento());
         assertNull(lancamento.getDataPagamento());
     }
+
     @Test
     void deveCriarPedidoComSucesso() {
-        PedidoRequest request = new PedidoRequest(
-                cliente.getId(),
-                FormaPagamento.PIX,
-                List.of(new ItemPedidoRequest(produto.getId(), 3)),
-                null
-        );
+        PedidoRequest request = pedidoRequest(
+                cliente.getId(), FormaPagamento.PIX,
+                List.of(item(produto.getId(), 3)), null);
 
         PedidoResponse response = pedidoService.criar(request);
 
         assertNotNull(response.id());
-        assertEquals(StatusPedido.CONFIRMADO, response.status());
+        assertEquals(StatusPedido.PAGO, response.status()); // PIX à vista → PAGO
         assertEquals(new BigDecimal("107.70"), response.valorTotal());
         assertEquals(1, response.itens().size());
     }
 
     @Test
     void deveDiminuirEstoqueAoCriarPedido() {
-        PedidoRequest request = new PedidoRequest(
-                cliente.getId(),
-                FormaPagamento.DINHEIRO,
-                List.of(new ItemPedidoRequest(produto.getId(), 10)),
-                null
-        );
+        PedidoRequest request = pedidoRequest(
+                cliente.getId(), FormaPagamento.DINHEIRO,
+                List.of(item(produto.getId(), 10)), null);
 
         pedidoService.criar(request);
 
@@ -151,24 +154,18 @@ class PedidoServiceTest {
 
     @Test
     void deveLancarExcecaoQuandoEstoqueInsuficiente() {
-        PedidoRequest request = new PedidoRequest(
-                cliente.getId(),
-                FormaPagamento.PIX,
-                List.of(new ItemPedidoRequest(produto.getId(), 100)),
-                null
-        );
+        PedidoRequest request = pedidoRequest(
+                cliente.getId(), FormaPagamento.PIX,
+                List.of(item(produto.getId(), 100)), null);
 
         assertThrows(IllegalArgumentException.class, () -> pedidoService.criar(request));
     }
 
     @Test
     void deveCancelarPedidoERestaurarEstoque() {
-        PedidoRequest request = new PedidoRequest(
-                cliente.getId(),
-                FormaPagamento.PIX,
-                List.of(new ItemPedidoRequest(produto.getId(), 5)),
-                null
-        );
+        PedidoRequest request = pedidoRequest(
+                cliente.getId(), FormaPagamento.PIX,
+                List.of(item(produto.getId(), 5)), null);
 
         PedidoResponse pedido = pedidoService.criar(request);
         pedidoService.cancelar(pedido.id());
@@ -179,12 +176,9 @@ class PedidoServiceTest {
 
     @Test
     void deveCriarPedidoSemCliente() {
-        PedidoRequest request = new PedidoRequest(
-                null,  // ← clienteId deve ser null
-                FormaPagamento.DINHEIRO,
-                List.of(new ItemPedidoRequest(produto.getId(), 1)),
-                "Venda balcão"
-        );
+        PedidoRequest request = pedidoRequest(
+                null, FormaPagamento.DINHEIRO,
+                List.of(item(produto.getId(), 1)), "Venda balcão");
 
         PedidoResponse response = pedidoService.criar(request);
 

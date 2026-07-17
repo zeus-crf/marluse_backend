@@ -1,5 +1,6 @@
 package com.example.marluse.vendas.service;
 
+
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
 import com.example.marluse.entrega.enums.StatusEntrega;

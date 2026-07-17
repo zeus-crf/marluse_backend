@@ -47,9 +47,10 @@ public class LancamentoServiceTest {
                 "Descrição de teste",
                 valor,
                 status,
+                null,   // recorrencia
                 status == StatusLancamento.PAGO ? LocalDate.now() : null,
-                vencimento
-
+                vencimento,
+                null    // clienteId
         );
     }
 
