@@ -13,7 +13,6 @@ import com.example.marluse.locacoes.dto.ItemLocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoResponse;
 import com.example.marluse.locacoes.enums.StatusLocacao;
-import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
 import com.example.marluse.locacoes.service.LocacaoService;
 import com.example.marluse.vendas.enums.FormaPagamento;
@@ -65,6 +64,7 @@ public class LocacoesServiceTest {
         produto = produtoRepository.save(Produto.builder()
                 .nome("Andaime")
                 .preco(new BigDecimal("50.00"))
+                .valorCompra(new BigDecimal("30.00"))
                 .quantidadeEstoque(5)
                 .estoqueMinimo(2)
                 .medida(UnidadeMedida.PECA)
@@ -79,56 +79,55 @@ public class LocacoesServiceTest {
                 .build());
     }
 
-        private LocacaoRequest locacaoValida (String clienteId, int quantidade, int dias) {
-            LocalDate retirada = LocalDate.now();
-            LocalDate devolucao = retirada.plusDays(dias);
-            return new LocacaoRequest(
-                    clienteId,
-                    FormaPagamento.PIX,
-                    retirada,
-                    devolucao,
-                    List.of(new ItemLocacaoRequest(produto.getId(), quantidade)),
-                    null
-            );
+    /** Item com produto existente, baixando estoque. */
+    private ItemLocacaoRequest item(String produtoId, int quantidade) {
+        return new ItemLocacaoRequest(produtoId, null, quantidade, null, true, false);
+    }
+
+    /** LocacaoRequest mínimo: campos essenciais, o resto null. */
+    private LocacaoRequest locacaoRequest(String clienteId, FormaPagamento forma,
+                                          LocalDate retirada, LocalDate devolucao,
+                                          List<ItemLocacaoRequest> itens, String observacao) {
+        return new LocacaoRequest(
+                clienteId, forma, retirada, devolucao, itens, observacao,
+                null, null, null, null, null, null, null, null, null);
+    }
+
+    private LocacaoRequest locacaoValida(String clienteId, int quantidade, int dias) {
+        LocalDate retirada = LocalDate.now();
+        LocalDate devolucao = retirada.plusDays(dias);
+        return locacaoRequest(clienteId, FormaPagamento.PIX, retirada, devolucao,
+                List.of(item(produto.getId(), quantidade)), null);
     }
 
     @Test
-    void deveCriarLancamentoPagoAoCriarLocacaoComPagamentoImediato() {
-        LocacaoRequest request = new LocacaoRequest(
-                cliente.getId(),
-                FormaPagamento.PIX,
-                LocalDate.now(),
-                LocalDate.now().plusDays(3),
-                List.of(new ItemLocacaoRequest(produto.getId(), 1)),
-                null
-        );
+    void deveCriarLancamentoAoCriarLocacao() {
+        LocacaoRequest request = locacaoRequest(
+                cliente.getId(), FormaPagamento.PIX,
+                LocalDate.now(), LocalDate.now().plusDays(3),
+                List.of(item(produto.getId(), 1)), null);
 
-        LocacaoResponse locacao = locacaoService.criar(request);
+        LocacaoResponse locacao = locacaoService.criar(request, false);
 
         List<LancamentoFinanceiro> lancamentos = lancamentoRepository.findAll();
         assertEquals(1, lancamentos.size());
 
         LancamentoFinanceiro lancamento = lancamentos.get(0);
         assertEquals(TipoLancamento.RECEITA, lancamento.getTipo());
-        assertEquals(StatusLancamento.PAGO, lancamento.getStatus());
-        assertEquals("Locação", lancamento.getCategoria());
+        // Locação nasce PENDENTE — pagamento é confirmado na devolução
+        assertEquals(StatusLancamento.PENDENTE, lancamento.getStatus());
         assertEquals(locacao.id(), lancamento.getLocacao().getId());
-        assertNotNull(lancamento.getDataPagamento());
     }
 
     @Test
     void deveCriarLancamentoPendenteAoCriarLocacaoFiado() {
         LocalDate dataFim = LocalDate.now().plusDays(5);
 
-        LocacaoRequest request = new LocacaoRequest(
-                cliente.getId(),
-                FormaPagamento.FIADO,
-                LocalDate.now(),
-                dataFim,
-                List.of(new ItemLocacaoRequest(produto.getId(), 1)),
-                null
-        );
-        locacaoService.criar(request);
+        LocacaoRequest request = locacaoRequest(
+                cliente.getId(), FormaPagamento.FIADO,
+                LocalDate.now(), dataFim,
+                List.of(item(produto.getId(), 1)), null);
+        locacaoService.criar(request, false);
 
         List<LancamentoFinanceiro> lancamentos = lancamentoRepository.findAll();
         assertEquals(1, lancamentos.size());
@@ -141,7 +140,7 @@ public class LocacoesServiceTest {
 
     @Test
     void deveCriarLocacaoComSucesso(){
-        LocacaoResponse response = locacaoService.criar(locacaoValida(cliente.getId(), 2, 3));
+        LocacaoResponse response = locacaoService.criar(locacaoValida(cliente.getId(), 2, 3), false);
 
         assertNotNull(response.id());
         assertEquals(StatusLocacao.ATIVA, response.status());
@@ -152,7 +151,7 @@ public class LocacoesServiceTest {
 
     @Test
     void deveDiminuirEstoqueAoCriarLocacao() {
-        locacaoService.criar(locacaoValida(null, 2, 5));
+        locacaoService.criar(locacaoValida(null, 2, 5), false);
 
         Produto atualizado = produtoRepository.findById(produto.getId()).orElseThrow();
         assertEquals(3, atualizado.getQuantidadeEstoque());
@@ -161,27 +160,23 @@ public class LocacoesServiceTest {
     @Test
     void deveLancarExcecaoQuandoEstoqueInsuficiente() {
         assertThrows(IllegalArgumentException.class,
-                () -> locacaoService.criar(locacaoValida(null, 10, 3)));
+                () -> locacaoService.criar(locacaoValida(null, 10, 3), false));
     }
 
     @Test
     void deveLancarExcecaoQuandoDatasInvalidas() {
         LocalDate retirada = LocalDate.now();
-        LocacaoRequest request = new LocacaoRequest(
-                null,
-                FormaPagamento.DINHEIRO,
-                retirada,
-                retirada, // mesma data — inválido
-                List.of(new ItemLocacaoRequest(produto.getId(), 1)),
-                null
-        );
+        LocacaoRequest request = locacaoRequest(
+                null, FormaPagamento.DINHEIRO,
+                retirada, retirada, // mesma data — inválido
+                List.of(item(produto.getId(), 1)), null);
 
-        assertThrows(IllegalArgumentException.class, () -> locacaoService.criar(request));
+        assertThrows(IllegalArgumentException.class, () -> locacaoService.criar(request, false));
     }
 
     @Test
     void deveDevolverLocacaoERestaurarEstoque() {
-        LocacaoResponse locacao = locacaoService.criar(locacaoValida(null, 3, 5));
+        LocacaoResponse locacao = locacaoService.criar(locacaoValida(null, 3, 5), false);
 
         locacaoService.devolver(locacao.id());
 
@@ -191,7 +186,7 @@ public class LocacoesServiceTest {
 
     @Test
     void deveCriarLocacaoSemCliente() {
-        LocacaoResponse response = locacaoService.criar(locacaoValida(null, 1, 2));
+        LocacaoResponse response = locacaoService.criar(locacaoValida(null, 1, 2), false);
 
         assertNull(response.clienteId());
         assertEquals("Consumidor Final", response.clienteNome());

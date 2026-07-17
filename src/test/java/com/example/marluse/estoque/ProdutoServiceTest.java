@@ -1,5 +1,6 @@
 package com.example.marluse.estoque;
 
+import com.example.marluse.estoque.dto.CategoriaProduto;
 import com.example.marluse.estoque.dto.ProdutoAtualizarRequest;
 import com.example.marluse.estoque.dto.ProdutoRequest;
 import com.example.marluse.estoque.dto.ProdutoResponse;
@@ -37,7 +38,14 @@ public class ProdutoServiceTest {
     }
 
     private ProdutoRequest produtoValido(String nome, int quantidade) {
-        return new ProdutoRequest(nome, "Descrição", new BigDecimal("25.00"), quantidade, 5, UnidadeMedida.SACO);
+        return new ProdutoRequest(
+                nome, "Descrição",
+                new BigDecimal("10.00"),   // valorCompra
+                new BigDecimal("25.00"),   // preco
+                new BigDecimal("5.00"),    // precoDiaria
+                quantidade, 5,
+                UnidadeMedida.SACO,
+                CategoriaProduto.OUTROS);
     }
 
     @Test
@@ -77,7 +85,14 @@ public class ProdutoServiceTest {
     void deveAtualizarProduto() {
         ProdutoResponse criado = produtoService.criar(produtoValido("Cimento", 50));
 
-        ProdutoAtualizarRequest atualizado = new ProdutoAtualizarRequest("Cimento CP-II", "Nova descrição", new BigDecimal("30.00"), 50, 10, UnidadeMedida.SACO);
+        ProdutoAtualizarRequest atualizado = new ProdutoAtualizarRequest(
+                "Cimento CP-II", "Nova descrição",
+                new BigDecimal("12.00"),   // valorCompra
+                new BigDecimal("30.00"),   // preco
+                new BigDecimal("6.00"),    // precoDiaria
+                50, 10,
+                UnidadeMedida.SACO,
+                CategoriaProduto.OUTROS);
         ProdutoResponse response = produtoService.atualizar(criado.id(), atualizado);
 
         assertEquals("Cimento CP-II", response.nome());

@@ -51,4 +51,8 @@ public class Produto extends BaseEntity {
     @Column(name = "categoria", length = 50)
     private CategoriaProduto categoria;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean rascunho = false;
+
 }
