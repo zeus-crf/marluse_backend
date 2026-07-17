@@ -12,7 +12,7 @@ public record ProdutoResponse(
         BigDecimal valorCompra,
         BigDecimal preco,
         BigDecimal precoDiaria,
-        Integer quantidadeEstoque,
+        BigDecimal quantidadeEstoque,
         Integer estoqueMinimo,
         boolean ativo,
         boolean estoqueBaixo,
@@ -31,7 +31,7 @@ public record ProdutoResponse(
                 produto.getQuantidadeEstoque(),
                 produto.getEstoqueMinimo(),
                 produto.isAtivo(),
-                produto.getQuantidadeEstoque() <= produto.getEstoqueMinimo(),
+                produto.getQuantidadeEstoque().compareTo(BigDecimal.valueOf(produto.getEstoqueMinimo())) <= 0,
                 produto.getMedida(),
                 produto.getCategoria(),
                 produto.isRascunho()

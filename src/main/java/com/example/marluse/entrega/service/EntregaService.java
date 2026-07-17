@@ -17,6 +17,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Service
@@ -41,8 +42,8 @@ public class EntregaService {
             for (ItemPedido item : pedido.getItens()) {
                 if (item.isBaixar_estoque() && !item.isEstoqueDescontado()) {
                     Produto produto = item.getProduto();
-                    int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
-                    if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+                    BigDecimal novoSaldo = produto.getQuantidadeEstoque().subtract(item.getQuantidade());
+                    if (novoSaldo.signum() < 0 && !item.isPermitirSemEstoque()) {
                         throw new IllegalArgumentException(
                                 "Estoque insuficiente para entregar: " + produto.getNome());
                     }
@@ -62,8 +63,8 @@ public class EntregaService {
             for (ItemLocacao item : locacao.getItens()) {
                 if (item.isBaixar_estoque() && !item.isEstoqueDescontado()) {
                     Produto produto = item.getProduto();
-                    int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
-                    if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+                    BigDecimal novoSaldo = produto.getQuantidadeEstoque().subtract(item.getQuantidade());
+                    if (novoSaldo.signum() < 0 && !item.isPermitirSemEstoque()) {
                         throw new IllegalArgumentException(
                                 "Estoque insuficiente para entregar: " + produto.getNome());
                     }

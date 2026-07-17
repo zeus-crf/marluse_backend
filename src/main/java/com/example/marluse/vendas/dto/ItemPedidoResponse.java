@@ -8,7 +8,7 @@ public record ItemPedidoResponse(
         String id,
         String produtoId,
         String produtoNome,
-        Integer quantidade,
+        BigDecimal quantidade,
         BigDecimal precoUnitario,
         BigDecimal subtotal,
         boolean baixarEstoque,

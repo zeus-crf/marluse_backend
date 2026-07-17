@@ -1,6 +1,6 @@
 package com.example.marluse.locacoes.dto;
 
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -12,8 +12,8 @@ public record ItemLocacaoRequest (
         String produtoNome,
 
         @NotNull(message = "Quantidade é obrigatória")
-        @Min(value = 1, message = "Quantidade deve ser maior que zero")
-        Integer quantidade,
+        @DecimalMin(value = "0", inclusive = false, message = "Quantidade deve ser maior que zero")
+        BigDecimal quantidade,
 
         BigDecimal precoDiaria,
 

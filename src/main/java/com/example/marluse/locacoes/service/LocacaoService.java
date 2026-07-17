@@ -115,7 +115,7 @@ public class LocacaoService {
 
 
             BigDecimal subtotal = diaria
-                    .multiply(BigDecimal.valueOf(itemRequest.quantidade()))
+                    .multiply(itemRequest.quantidade())
                     .multiply(BigDecimal.valueOf(dias));
 
             ItemLocacao item = ItemLocacao.builder()
@@ -320,7 +320,7 @@ public class LocacaoService {
         for (ItemLocacao item : locacao.getItens()) {
             if (item.isEstoqueDescontado()) {
                 Produto produto = item.getProduto();
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque().add(item.getQuantidade()));
                 produtoRepository.save(produto);
                 item.setEstoqueDescontado(false);
             }
@@ -348,7 +348,7 @@ public class LocacaoService {
         if (locacao.isEstoqueDescontado()) {
             for (ItemLocacao item : locacao.getItens()) {
                 Produto produto = item.getProduto();
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque().add(item.getQuantidade()));
                 produtoRepository.save(produto);
             }
         }
@@ -371,7 +371,7 @@ public class LocacaoService {
         if (locacao.isEstoqueDescontado()) {
             for (ItemLocacao item : locacao.getItens()) {
                 Produto produto = item.getProduto();
-                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                produto.setQuantidadeEstoque(produto.getQuantidadeEstoque().add(item.getQuantidade()));
                 produtoRepository.save(produto);
             }
         }
@@ -457,8 +457,8 @@ public class LocacaoService {
 
     private void baixarEstoque(ItemLocacao item) {
         Produto produto = item.getProduto();
-        int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
-        if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+        BigDecimal novoSaldo = produto.getQuantidadeEstoque().subtract(item.getQuantidade());
+        if (novoSaldo.signum() < 0 && !item.isPermitirSemEstoque()) {
             throw new IllegalArgumentException("Estoque insuficiente para" + produto.getNome());
         }
         produto.setQuantidadeEstoque(novoSaldo);

@@ -26,8 +26,8 @@ public record ProdutoRequest(
         @DecimalMin(value = "0.0", inclusive = false, message = "Preço da diária deve ser maior que zero")
         BigDecimal precoDiaria,
 
-        @Min(value = 0, message = "Quantidade não pode ser negativa")
-        Integer quantidadeEstoque,
+        @DecimalMin(value = "0", message = "Quantidade não pode ser negativa")
+        BigDecimal quantidadeEstoque,
 
         @Min(value = 0, message = "Estoque mínimo não pode ser negativo")
         Integer estoqueMinimo,

@@ -24,8 +24,8 @@ public class ItemPedido extends BaseEntity {
     @JoinColumn(name = "produto_id", nullable = false)
     private Produto produto;
 
-    @Column(nullable = false)
-    private Integer quantidade;
+    @Column(nullable = false, precision = 12, scale = 3)
+    private BigDecimal quantidade;
 
     @Column(name = "preco_unitario", nullable = false, precision = 10, scale = 2)
     private BigDecimal precoUnitario;

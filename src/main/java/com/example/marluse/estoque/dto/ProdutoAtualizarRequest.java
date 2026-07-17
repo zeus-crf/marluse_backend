@@ -15,7 +15,7 @@ public record ProdutoAtualizarRequest(
         BigDecimal valorCompra,
         BigDecimal preco,
         BigDecimal precoDiaria,
-        Integer quantidadeEstoque,
+        BigDecimal quantidadeEstoque,
         Integer estoqueMinimo,
         UnidadeMedida medida,
         CategoriaProduto categoria
