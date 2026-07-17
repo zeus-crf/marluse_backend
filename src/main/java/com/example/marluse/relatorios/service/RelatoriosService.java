@@ -148,7 +148,7 @@ public class RelatoriosService {
                     BigDecimal lucro = total.subtract(custo);
                     return new TopProdutoResponse(
                             (String) r[0],
-                            ((Number) r[1]).longValue(),
+                            (BigDecimal) r[1],
                             lucro,
                             custo,
                             total

@@ -63,7 +63,7 @@ class PedidoServiceTest {
                 .nome("Cimento")
                 .preco(new BigDecimal("35.90"))
                 .valorCompra(new BigDecimal("20.00"))
-                .quantidadeEstoque(50)
+                .quantidadeEstoque(BigDecimal.valueOf(50))
                 .estoqueMinimo(5)
                 .medida(UnidadeMedida.SACO)
                 .ativo(true)
@@ -79,7 +79,7 @@ class PedidoServiceTest {
 
     /** Item com produto existente, baixando estoque (comportamento padrão dos testes). */
     private ItemPedidoRequest item(String produtoId, int quantidade) {
-        return new ItemPedidoRequest(produtoId, null, quantidade, null, true, false);
+        return new ItemPedidoRequest(produtoId, null, BigDecimal.valueOf(quantidade), null, true, false);
     }
 
     /** PedidoRequest mínimo: apenas os campos essenciais, o resto null. */
@@ -149,7 +149,7 @@ class PedidoServiceTest {
         pedidoService.criar(request);
 
         Produto atualizado = produtoRepository.findById(produto.getId()).orElseThrow();
-        assertEquals(40, atualizado.getQuantidadeEstoque());
+        assertEquals(0, atualizado.getQuantidadeEstoque().compareTo(BigDecimal.valueOf(40)));
     }
 
     @Test
@@ -171,7 +171,7 @@ class PedidoServiceTest {
         pedidoService.cancelar(pedido.id());
 
         Produto atualizado = produtoRepository.findById(produto.getId()).orElseThrow();
-        assertEquals(50, atualizado.getQuantidadeEstoque());
+        assertEquals(0, atualizado.getQuantidadeEstoque().compareTo(BigDecimal.valueOf(50)));
     }
 
     @Test

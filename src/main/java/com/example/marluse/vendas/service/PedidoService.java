@@ -119,7 +119,7 @@ public class PedidoService {
                     ? itemRequest.preco()
                     : produto.getPreco();
 
-            BigDecimal subTotal = precoVenda.multiply(BigDecimal.valueOf(itemRequest.quantidade()));
+            BigDecimal subTotal = precoVenda.multiply(itemRequest.quantidade());
 
             ItemPedido item = ItemPedido.builder()
                     .pedido(pedido)
@@ -285,7 +285,7 @@ public class PedidoService {
             for (ItemPedido item : pedido.getItens()) {
                 if (item.isEstoqueDescontado()) {
                     Produto produto = item.getProduto();
-                    produto.setQuantidadeEstoque(produto.getQuantidadeEstoque() + item.getQuantidade());
+                    produto.setQuantidadeEstoque(produto.getQuantidadeEstoque().add(item.getQuantidade()));
                     produtoRepository.save(produto);
                     item.setEstoqueDescontado(false);
                 }
@@ -441,8 +441,8 @@ public class PedidoService {
 
     private void baixarEstoque(ItemPedido item) {
         Produto produto = item.getProduto();
-        int novoSaldo = produto.getQuantidadeEstoque() - item.getQuantidade();
-        if (novoSaldo < 0 && !item.isPermitirSemEstoque()) {
+        BigDecimal novoSaldo = produto.getQuantidadeEstoque().subtract(item.getQuantidade());
+        if (novoSaldo.signum() < 0 && !item.isPermitirSemEstoque()) {
             throw new IllegalArgumentException("Estoque insuficiente: " + produto.getNome());
         }
         produto.setQuantidadeEstoque(novoSaldo);

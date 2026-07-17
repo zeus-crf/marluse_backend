@@ -32,8 +32,8 @@ public class Produto extends BaseEntity {
     private BigDecimal precoDiaria;
 
     @Builder.Default
-    @Column(name = "quantidade_estoque", nullable = false)
-    private Integer quantidadeEstoque = 0;
+    @Column(name = "quantidade_estoque", nullable = false, precision = 12, scale = 3)
+    private BigDecimal quantidadeEstoque = BigDecimal.ZERO;
 
     @Builder.Default
     @Column(name = "estoque_minimo")

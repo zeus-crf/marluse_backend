@@ -65,7 +65,7 @@ public class LocacoesServiceTest {
                 .nome("Andaime")
                 .preco(new BigDecimal("50.00"))
                 .valorCompra(new BigDecimal("30.00"))
-                .quantidadeEstoque(5)
+                .quantidadeEstoque(BigDecimal.valueOf(5))
                 .estoqueMinimo(2)
                 .medida(UnidadeMedida.PECA)
                 .ativo(true)
@@ -81,7 +81,7 @@ public class LocacoesServiceTest {
 
     /** Item com produto existente, baixando estoque. */
     private ItemLocacaoRequest item(String produtoId, int quantidade) {
-        return new ItemLocacaoRequest(produtoId, null, quantidade, null, true, false);
+        return new ItemLocacaoRequest(produtoId, null, BigDecimal.valueOf(quantidade), null, true, false);
     }
 
     /** LocacaoRequest mínimo: campos essenciais, o resto null. */
@@ -154,7 +154,7 @@ public class LocacoesServiceTest {
         locacaoService.criar(locacaoValida(null, 2, 5), false);
 
         Produto atualizado = produtoRepository.findById(produto.getId()).orElseThrow();
-        assertEquals(3, atualizado.getQuantidadeEstoque());
+        assertEquals(0, atualizado.getQuantidadeEstoque().compareTo(BigDecimal.valueOf(3)));
     }
 
     @Test
@@ -181,7 +181,7 @@ public class LocacoesServiceTest {
         locacaoService.devolver(locacao.id());
 
         Produto atualizado = produtoRepository.findById(produto.getId()).orElseThrow();
-        assertEquals(5, atualizado.getQuantidadeEstoque());
+        assertEquals(0, atualizado.getQuantidadeEstoque().compareTo(BigDecimal.valueOf(5)));
     }
 
     @Test

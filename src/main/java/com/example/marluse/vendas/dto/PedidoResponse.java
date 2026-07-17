@@ -49,7 +49,7 @@ public record PedidoResponse(
 
     public static PedidoResponse from(Pedido pedido, List<ParcelaResponse> parcelas, ParcelaResponse parcelaMesAtual) {
        BigDecimal bruto = pedido.getItens().stream()
-               .map(i -> i.getPrecoUnitario().multiply(BigDecimal.valueOf(i.getQuantidade())))
+               .map(i -> i.getPrecoUnitario().multiply(i.getQuantidade()))
                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new PedidoResponse(

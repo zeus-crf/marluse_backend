@@ -43,7 +43,7 @@ public class ProdutoServiceTest {
                 new BigDecimal("10.00"),   // valorCompra
                 new BigDecimal("25.00"),   // preco
                 new BigDecimal("5.00"),    // precoDiaria
-                quantidade, 5,
+                BigDecimal.valueOf(quantidade), 5,
                 UnidadeMedida.SACO,
                 CategoriaProduto.OUTROS);
     }
@@ -54,7 +54,7 @@ public class ProdutoServiceTest {
 
         assertNotNull(response.id());
         assertEquals("Cimento", response.nome());
-        assertEquals(50, response.quantidadeEstoque());
+        assertEquals(0, response.quantidadeEstoque().compareTo(BigDecimal.valueOf(50)));
         assertTrue(response.ativo());
     }
 
@@ -90,7 +90,7 @@ public class ProdutoServiceTest {
                 new BigDecimal("12.00"),   // valorCompra
                 new BigDecimal("30.00"),   // preco
                 new BigDecimal("6.00"),    // precoDiaria
-                50, 10,
+                BigDecimal.valueOf(50), 10,
                 UnidadeMedida.SACO,
                 CategoriaProduto.OUTROS);
         ProdutoResponse response = produtoService.atualizar(criado.id(), atualizado);

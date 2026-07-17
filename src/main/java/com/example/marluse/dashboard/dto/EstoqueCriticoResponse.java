@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 public record EstoqueCriticoResponse(
         String id,
         String nome,
-        int quantidadeAtual,
+        BigDecimal quantidadeAtual,
         int estoqueMinimo,
         BigDecimal preco
 ){

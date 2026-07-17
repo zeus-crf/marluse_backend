@@ -8,7 +8,7 @@ public record ItemLocacaoResponse(
         String id,
         String produtoId,
         String produtoNome,
-        Integer quantidade,
+        BigDecimal quantidade,
         BigDecimal precoDiaria,
         BigDecimal subtotal,
         boolean baixarEstoque,
