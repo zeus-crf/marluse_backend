@@ -103,7 +103,7 @@ public class PedidoService {
         for (ItemPedidoRequest itemRequest : request.itens()) {
             Produto produto;
             if (itemRequest.isProdutoNovo()){
-                produtoService.criarRascunho(itemRequest.produtoNome(), itemRequest.preco(), itemRequest.preco());
+                produto = produtoService.criarRascunho(itemRequest.produtoNome(), itemRequest.preco(), itemRequest.preco());
             } else if (itemRequest.productId() != null && !itemRequest.productId().isBlank()){
                 produto = produtoRepository.findById(itemRequest.productId())
                         .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));

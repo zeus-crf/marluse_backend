@@ -24,6 +24,6 @@ public record ItemLocacaoRequest (
 
     public boolean isProdutoNovo() {
         return (produtoId == null || produtoId.isBlank())
-                    && (produtoNome != null || !produtoNome.isBlank());
+                    && (produtoNome != null && !produtoNome.isBlank());
     }
 }

@@ -8,6 +8,7 @@ import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -43,6 +44,7 @@ public class ProdutoService {
 
     }
 
+    @Transactional
     public Produto criarRascunho( String nome, BigDecimal preco, BigDecimal precoDiaria){
 
         BigDecimal precoVenda = preco != null ? preco :
@@ -50,7 +52,7 @@ public class ProdutoService {
 
         Produto produto = Produto.builder()
                 .nome(nome)
-                .preco(preco)
+                .preco(precoVenda)
                 .precoDiaria(precoDiaria != null ? precoDiaria : precoVenda)
                 .valorCompra(BigDecimal.ZERO)
                 .quantidadeEstoque(0)
@@ -67,7 +69,7 @@ public class ProdutoService {
     }
 
     public List<ProdutoResponse> listar(){
-        return produtoRepository.findByAtivoTrue()
+        return produtoRepository.findByAtivoTrueAndRascunhoFalse()
                 .stream()
                 .map(ProdutoResponse::from)
                 .toList();
@@ -80,7 +82,7 @@ public class ProdutoService {
     }
 
     public List<ProdutoResponse> listarRascunho() {
-        return produtoRepository.findByAtivoAndRascunhoTrue()
+        return produtoRepository.findByAtivoTrueAndRascunhoTrue()
                 .stream()
                 .map(ProdutoResponse::from)
                 .toList();

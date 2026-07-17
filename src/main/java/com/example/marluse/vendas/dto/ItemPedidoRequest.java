@@ -24,6 +24,6 @@ public record ItemPedidoRequest(
 
     public boolean isProdutoNovo() {
         return  (productId == null || productId.isBlank())
-                    && produtoNome != null & !produtoNome.isBlank();
+                    && produtoNome != null && !produtoNome.isBlank();
     }
 }
