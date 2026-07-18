@@ -37,10 +37,9 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarReceitaPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
-    /** Soma somente lançamentos de vendas (pedido IS NOT NULL) pagos no período — usa dataPagamento */
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l " +
-           "WHERE l.pedido IS NOT NULL AND l.status = 'PAGO' " +
-           "AND l.dataPagamento BETWEEN :inicio AND :fim")
+            "WHERE l.pedido IS NOT NULL AND l.status = 'PAGO' AND l.valorPago = 0 " +
+            "AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarReceitaVendasPorPagamento(@Param("inicio") LocalDate inicio,
                                               @Param("fim") LocalDate fim);
 
@@ -157,5 +156,22 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
            "AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarReceitaLocacoesPorPagamento(@Param("inicio") LocalDate inicio,
                                                 @Param("fim") LocalDate fim);
+
+
+    /** Lançamentos RECEITA em aberto de um cliente, ordenados: pedido/locação mais antigo primeiro,
+     *  depois número da parcela. Usa a data de movimento do pedido/locação (COALESCE). */
+    @Query("SELECT l FROM LancamentoFinanceiro l " +
+            "LEFT JOIN l.pedido pe LEFT JOIN l.locacao lo " +
+            "WHERE l.cliente.id = :clienteId AND l.tipo = 'RECEITA' " +
+            "AND l.status IN ('PENDENTE','VENCIDO') " +
+            "AND l.valorPago < l.valor " +
+            "ORDER BY COALESCE(pe.dataMovimento, lo.dataMovimento) ASC, l.numParcelas ASC")
+    List<LancamentoFinanceiro> findEmAbertoPorClienteFifo(@Param("clienteId") String clienteId);
+
+    /** Saldo devedor total do cliente = soma de (valor - valorPago) dos lançamentos em aberto. */
+    @Query("SELECT COALESCE(SUM(l.valor - l.valorPago), 0) FROM LancamentoFinanceiro l " +
+            "WHERE l.cliente.id = :clienteId AND l.tipo = 'RECEITA' " +
+            "AND l.status IN ('PENDENTE','VENCIDO')")
+    BigDecimal saldoDevedorPorCliente(@Param("clienteId") String clienteId);
 
 }
