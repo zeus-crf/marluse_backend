@@ -30,7 +30,7 @@ public class PagamentoCliente extends BaseEntity {
     @Column(nullable = false)
     private LocalDate data;
 
-    private String obervacao;
+    private String observacao;
 
     @Builder.Default
     @Column(nullable = false)
