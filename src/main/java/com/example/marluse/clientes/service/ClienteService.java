@@ -3,6 +3,7 @@ package com.example.marluse.clientes.service;
 import com.example.marluse.clientes.dto.*;
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
+import com.example.marluse.financeiro.model.LancamentoFinanceiro;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
 import com.example.marluse.vendas.repository.PedidoRepository;
@@ -77,23 +78,37 @@ public class ClienteService {
         List<ClienteSaldoResponse.ItemDevido> itens =
                 lancamentoFinanceiroRepository.findEmAbertoPorClienteFifo(cliente.getId())
                         .stream()
-                        .map(l -> {
-                            boolean ehPedido = l.getPedido() != null;
-                            var origem = ehPedido ? l.getPedido() : null;
-                            var loc = l.getLocacao();
-                            return new ClienteSaldoResponse.ItemDevido(
-                                    ehPedido ? "PEDIDO" : "LOCAÇÂO",
-                                    ehPedido ? l.getPedido().getId() : (loc != null ? loc.getId() : null),
-                                    ehPedido ? l.getPedido().getNumero() : (loc != null ? loc.getNumero() : null),
-                                    ehPedido ? l.getPedido().getDataMovimento() : (loc != null ? loc.getDataMovimento() : null),
-                                    l.getValor(),
-                                    l.getValorPago(),
-                                    l.getValor().subtract(l.getValorPago())
-                            );
-                        })
+                        .map(this::toItemDevido)
                         .toList();
 
         return new ClienteSaldoResponse(saldoDevedor, itens);
+    }
+
+    /**
+     * Converte um lançamento em aberto na linha que a tela exibe. A origem pode ser um pedido,
+     * uma locação ou — quando a receita foi lançada direto no financeiro para um cliente — o
+     * próprio lançamento, que não tem número nem data de movimento.
+     */
+    private ClienteSaldoResponse.ItemDevido toItemDevido(LancamentoFinanceiro l) {
+        BigDecimal saldo = l.getValor().subtract(l.getValorPago());
+
+        if (l.getPedido() != null) {
+            var pedido = l.getPedido();
+            return new ClienteSaldoResponse.ItemDevido(
+                    "PEDIDO", pedido.getId(), pedido.getNumero(), pedido.getDataMovimento(),
+                    l.getValor(), l.getValorPago(), saldo);
+        }
+
+        if (l.getLocacao() != null) {
+            var locacao = l.getLocacao();
+            return new ClienteSaldoResponse.ItemDevido(
+                    "LOCACAO", locacao.getId(), locacao.getNumero(), locacao.getDataMovimento(),
+                    l.getValor(), l.getValorPago(), saldo);
+        }
+
+        return new ClienteSaldoResponse.ItemDevido(
+                "LANCAMENTO", l.getId(), null, l.getDataVencimento(),
+                l.getValor(), l.getValorPago(), saldo);
     }
 
 

@@ -2,6 +2,7 @@
 package com.example.marluse.relatorios.service;
 
 import com.example.marluse.financeiro.enums.StatusLancamento;
+import com.example.marluse.financeiro.repository.AbatimentoRepository;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.relatorios.dto.*;
 import com.example.marluse.vendas.enums.StatusPedido;
@@ -25,8 +26,16 @@ import java.util.stream.Collectors;
 public class RelatoriosService {
 
     private final LancamentoFinanceiroRepository lancamentoRepository;
+    private final AbatimentoRepository abatimentoRepository;
     private final PedidoRepository pedidoRepository;
     private final ItemPedidoRepository itemPedidoRepository;
+
+    /** Receita realizada = parcelas quitadas à vista (valorPago = 0) + abatimentos de dívida
+     *  recebidos no período. As duas fontes nunca se sobrepõem (invariante do valorPago). */
+    private BigDecimal receitaRecebida(LocalDate inicio, LocalDate fim) {
+        return lancamentoRepository.somarReceitaPorPeriodo(inicio, fim)
+                .add(abatimentoRepository.somarAbatimentosPorPeriodo(inicio, fim));
+    }
 
     // ── KPIs ──────────────────────────────────────────────────────────────────
 
@@ -34,7 +43,7 @@ public class RelatoriosService {
         LocalDate hoje = LocalDate.now();
         LocalDate inicioPeriodo = resolverInicio(periodo, hoje);
 
-        BigDecimal receita     = lancamentoRepository.somarReceitaPorPeriodo(inicioPeriodo, hoje);
+        BigDecimal receita     = receitaRecebida(inicioPeriodo, hoje);
         BigDecimal despesas    = lancamentoRepository.somarDespesaPorPeriodo(inicioPeriodo, hoje);
         BigDecimal cmv         = itemPedidoRepository.somarCmvPorPeriodo(
                 inicioPeriodo.atStartOfDay(), hoje.atTime(23, 59, 59));
@@ -49,7 +58,7 @@ public class RelatoriosService {
         LocalDate inicioMesAnterior = inicioMesAtual.minusMonths(1);
         LocalDate fimMesAnterior    = inicioMesAtual.minusDays(1);
 
-        BigDecimal receitaMes  = lancamentoRepository.somarReceitaPorPeriodo(inicioMesAtual, hoje);
+        BigDecimal receitaMes  = receitaRecebida(inicioMesAtual, hoje);
         BigDecimal despesasMes = lancamentoRepository.somarDespesaPorPeriodo(inicioMesAtual, hoje);
         BigDecimal cmvMes      = itemPedidoRepository.somarCmvPorPeriodo(
                 inicioMesAtual.atStartOfDay(), hoje.atTime(23, 59, 59));
@@ -59,7 +68,7 @@ public class RelatoriosService {
                 ? receitaMes.divide(BigDecimal.valueOf(pedidosMes), 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        BigDecimal receitaAnt  = lancamentoRepository.somarReceitaPorPeriodo(inicioMesAnterior, fimMesAnterior);
+        BigDecimal receitaAnt  = receitaRecebida(inicioMesAnterior, fimMesAnterior);
         BigDecimal despesasAnt = lancamentoRepository.somarDespesaPorPeriodo(inicioMesAnterior, fimMesAnterior);
         BigDecimal cmvAnt      = itemPedidoRepository.somarCmvPorPeriodo(
                 inicioMesAnterior.atStartOfDay(), fimMesAnterior.atTime(23, 59, 59));

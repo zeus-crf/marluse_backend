@@ -5,11 +5,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record ClienteSaldoResponse(
-        BigDecimal saldoDevolver,
+        BigDecimal saldoDevedor,
         List<ItemDevido> itens
 ) {
     public record ItemDevido(
-            String origemTipo,   // "PEDIDO" ou "LOCACAO"
+            String origemTipo,   // "PEDIDO", "LOCACAO" ou "LANCAMENTO" (receita avulsa com cliente)
             String origemId,
             Long numero,
             LocalDate data,

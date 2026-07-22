@@ -28,7 +28,9 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
     List<LancamentoFinanceiro> findByDataVencimentoBetween(LocalDate inicio, LocalDate fim);
 
-    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = :tipo AND l.status = 'PAGO' AND l.dataPagamento = :data")
+    /** Lançamentos com valorPago > 0 foram quitados via abatimento: o dinheiro deles é contado
+     *  pelos registros de Abatimento, nunca pelo valor da parcela (evita dupla contagem). */
+    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = :tipo AND l.status = 'PAGO' AND l.valorPago = 0 AND l.dataPagamento = :data")
     BigDecimal somarPorTipoEData(TipoLancamento tipo, LocalDate data);
 
     @Query("SELECT l FROM LancamentoFinanceiro l WHERE l.status = 'PENDENTE' AND l.dataVencimento < :hoje")
@@ -158,14 +160,18 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
                                                 @Param("fim") LocalDate fim);
 
 
-    /** Lançamentos RECEITA em aberto de um cliente, ordenados: pedido/locação mais antigo primeiro,
-     *  depois número da parcela. Usa a data de movimento do pedido/locação (COALESCE). */
+    /** Lançamentos RECEITA em aberto de um cliente, ordenados do mais antigo para o mais recente.
+     *  A data de referência é a do pedido/locação de origem; para receitas avulsas (sem pedido nem
+     *  locação, lançadas direto no financeiro) cai no vencimento do próprio lançamento — sem esse
+     *  fallback elas viriam com data NULL e o MySQL as ordenaria à frente de tudo.
+     *  Desempate por número da parcela e, por fim, id, para ordenação estável. */
     @Query("SELECT l FROM LancamentoFinanceiro l " +
             "LEFT JOIN l.pedido pe LEFT JOIN l.locacao lo " +
             "WHERE l.cliente.id = :clienteId AND l.tipo = 'RECEITA' " +
             "AND l.status IN ('PENDENTE','VENCIDO') " +
             "AND l.valorPago < l.valor " +
-            "ORDER BY COALESCE(pe.dataMovimento, lo.dataMovimento) ASC, l.numParcelas ASC")
+            "ORDER BY COALESCE(pe.dataMovimento, lo.dataMovimento, l.dataVencimento) ASC, " +
+            "COALESCE(l.numParcelas, 1) ASC, l.id ASC")
     List<LancamentoFinanceiro> findEmAbertoPorClienteFifo(@Param("clienteId") String clienteId);
 
     /** Saldo devedor total do cliente = soma de (valor - valorPago) dos lançamentos em aberto. */

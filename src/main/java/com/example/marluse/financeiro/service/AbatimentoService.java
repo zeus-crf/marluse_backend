@@ -119,6 +119,41 @@ public class AbatimentoService {
         abatimentoRepository.save(abatimento);
     }
 
+    /**
+     * Registra o recebimento do saldo restante de uma parcela que já foi tocada por abatimento.
+     *
+     * <p>Existe para fechar um buraco entre o caminho legado de pagamento ({@code pagar()}) e o
+     * caminho de abatimento. A invariante do sistema é: parcela com {@code valorPago = 0} tem seu
+     * dinheiro contado pelo próprio {@code valor}; parcela com {@code valorPago > 0} tem o dinheiro
+     * contado exclusivamente pelos registros de Abatimento. Se o {@code pagar()} apenas marcasse
+     * PAGO uma parcela parcialmente abatida, o restante ficaria fora das duas contagens e sumiria
+     * do caixa.
+     */
+    @Transactional
+    public void registrarQuitacao(LancamentoFinanceiro lanc, String observacao) {
+        BigDecimal restante = lanc.getValor().subtract(lanc.getValorPago());
+        if (restante.signum() <= 0) return;
+
+        Abatimento abatimento = Abatimento.builder()
+                .cliente(lanc.getCliente())
+                .valor(restante)
+                .data(LocalDate.now())
+                .observacao(observacao)
+                .estornado(false)
+                .build();
+
+        abatimento.getParcelas().add(AbatimentoParcela.builder()
+                .abatimento(abatimento)
+                .lancamento(lanc)
+                .valor(restante)
+                .build());
+
+        abatimentoRepository.save(abatimento);
+
+        lanc.setValorPago(lanc.getValor());
+        lancamentoRepository.save(lanc);
+    }
+
     /** Ao reabrir uma parcela quitada, respeita o vencimento: se já passou, volta como VENCIDO.
      *  Sem isso a parcela voltaria sempre como PENDENTE e só seria reclassificada no próximo
      *  ciclo do scheduler de vencidos. */
