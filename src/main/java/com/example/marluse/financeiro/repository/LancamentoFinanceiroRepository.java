@@ -161,17 +161,25 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
 
     /** Lançamentos RECEITA em aberto de um cliente, ordenados do mais antigo para o mais recente.
-     *  A data de referência é a do pedido/locação de origem; para receitas avulsas (sem pedido nem
-     *  locação, lançadas direto no financeiro) cai no vencimento do próprio lançamento — sem esse
-     *  fallback elas viriam com data NULL e o MySQL as ordenaria à frente de tudo.
-     *  Desempate por número da parcela e, por fim, id, para ordenação estável. */
+     *
+     *  <p>Três critérios, nesta ordem:
+     *  <ol>
+     *    <li><b>Data da origem</b> — do pedido/locação. Para receitas avulsas (sem pedido nem
+     *        locação, lançadas direto no financeiro) cai no vencimento do próprio lançamento; sem
+     *        esse fallback elas viriam com data NULL e o MySQL as ordenaria à frente de tudo.</li>
+     *    <li><b>Id da origem</b> — mantém as parcelas de um mesmo pedido/locação juntas. Sem isso,
+     *        pedidos de mesma data se intercalam e o abatimento paga a 1ª parcela de todos antes de
+     *        voltar para a 2ª, em vez de quitar um pedido por vez.</li>
+     *    <li><b>Número da parcela</b> — dentro da origem, da primeira para a última.</li>
+     *  </ol> */
     @Query("SELECT l FROM LancamentoFinanceiro l " +
             "LEFT JOIN l.pedido pe LEFT JOIN l.locacao lo " +
             "WHERE l.cliente.id = :clienteId AND l.tipo = 'RECEITA' " +
             "AND l.status IN ('PENDENTE','VENCIDO') " +
             "AND l.valorPago < l.valor " +
             "ORDER BY COALESCE(pe.dataMovimento, lo.dataMovimento, l.dataVencimento) ASC, " +
-            "COALESCE(l.numParcelas, 1) ASC, l.id ASC")
+            "COALESCE(pe.id, lo.id, l.id) ASC, " +
+            "COALESCE(l.numParcelas, 1) ASC")
     List<LancamentoFinanceiro> findEmAbertoPorClienteFifo(@Param("clienteId") String clienteId);
 
     /** Saldo devedor total do cliente = soma de (valor - valorPago) dos lançamentos em aberto. */
