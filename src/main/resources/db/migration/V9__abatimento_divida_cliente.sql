@@ -1,7 +1,11 @@
+-- Abatimento de dívida do cliente: pagamento parcial de lançamentos (valor_pago)
+-- + registro auditável de cada débito (abatimentos / abatimento_parcela).
+
 ALTER TABLE lancamento_financeiros
     ADD COLUMN valor_pago DECIMAL(10,2) NOT NULL DEFAULT 0;
 
-CREATE TABLE pagamentos_cliente (
+-- Um abatimento = um débito registrado pelo operador (o valor total digitado).
+CREATE TABLE abatimentos (
     id            VARCHAR(36)  NOT NULL,
     cliente_id    VARCHAR(36)  NOT NULL,
     valor         DECIMAL(10,2) NOT NULL,
@@ -12,17 +16,18 @@ CREATE TABLE pagamentos_cliente (
     created_at    DATETIME      NULL,
     updated_at    DATETIME      NULL,
     PRIMARY KEY (id),
-    CONSTRAINT fk_pagcliente_cliente FOREIGN KEY (cliente_id) REFERENCES clientes (id)
+    CONSTRAINT fk_abatimento_cliente FOREIGN KEY (cliente_id) REFERENCES clientes (id)
 );
 
+-- Distribuição do abatimento pelas parcelas (SUM(valor) = abatimentos.valor).
 CREATE TABLE abatimento_parcela (
-    id                   VARCHAR(36)  NOT NULL,
-    pagamento_cliente_id VARCHAR(36)  NOT NULL,
-    lancamento_id        VARCHAR(36)  NOT NULL,
-    valor                DECIMAL(10,2) NOT NULL,
-    created_at           DATETIME      NULL,
-    updated_at           DATETIME      NULL,
+    id             VARCHAR(36)  NOT NULL,
+    abatimento_id  VARCHAR(36)  NOT NULL,
+    lancamento_id  VARCHAR(36)  NOT NULL,
+    valor          DECIMAL(10,2) NOT NULL,
+    created_at     DATETIME      NULL,
+    updated_at     DATETIME      NULL,
     PRIMARY KEY (id),
-    CONSTRAINT fk_abat_pagamento  FOREIGN KEY (pagamento_cliente_id) REFERENCES pagamentos_cliente (id),
-    CONSTRAINT fk_abat_lancamento FOREIGN KEY (lancamento_id) REFERENCES lancamento_financeiros (id)
+    CONSTRAINT fk_abatparcela_abatimento FOREIGN KEY (abatimento_id) REFERENCES abatimentos (id),
+    CONSTRAINT fk_abatparcela_lancamento FOREIGN KEY (lancamento_id) REFERENCES lancamento_financeiros (id)
 );

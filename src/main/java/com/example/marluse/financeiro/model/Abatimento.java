@@ -7,18 +7,22 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Um débito registrado contra a dívida do cliente — o valor total que o operador digitou.
+ * A distribuição desse valor pelas parcelas em aberto fica em {@link AbatimentoParcela},
+ * valendo a invariante: SUM(parcelas.valor) == this.valor.
+ */
 @Entity
-@Table(name = "pagamentos_clientes")
+@Table(name = "abatimentos")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PagamentoCliente extends BaseEntity {
+public class Abatimento extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cliente_id", nullable = false)
@@ -37,9 +41,9 @@ public class PagamentoCliente extends BaseEntity {
     private boolean estornado = false;
 
     @Column(name = "estornado_em")
-    private LocalDateTime estotnadoEm;
+    private LocalDate estornadoEm;
 
     @Builder.Default
-    @OneToMany(mappedBy = "pagamentoCliente", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<AbatimentoParcela> abatimentos = new ArrayList<>();
+    @OneToMany(mappedBy = "abatimento", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AbatimentoParcela> parcelas = new ArrayList<>();
 }

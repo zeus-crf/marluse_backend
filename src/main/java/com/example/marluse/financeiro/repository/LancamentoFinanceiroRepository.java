@@ -34,7 +34,7 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
     @Query("SELECT l FROM LancamentoFinanceiro l WHERE l.status = 'PENDENTE' AND l.dataVencimento < :hoje")
     List<LancamentoFinanceiro> findVencidos(LocalDate hoje);
 
-    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.dataPagamento BETWEEN :inicio AND :fim")
+    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l WHERE l.tipo = 'RECEITA' AND l.status = 'PAGO' AND l.valorPago = 0 AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarReceitaPorPeriodo(@Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l " +
@@ -152,7 +152,7 @@ public interface LancamentoFinanceiroRepository extends JpaRepository<Lancamento
 
     /** Soma somente lançamentos de locações (locacao IS NOT NULL) pagos no período — usa dataPagamento */
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoFinanceiro l " +
-           "WHERE l.locacao IS NOT NULL AND l.status = 'PAGO' " +
+           "WHERE l.locacao IS NOT NULL AND l.status = 'PAGO' AND l.valorPago = 0 " +
            "AND l.dataPagamento BETWEEN :inicio AND :fim")
     BigDecimal somarReceitaLocacoesPorPagamento(@Param("inicio") LocalDate inicio,
                                                 @Param("fim") LocalDate fim);
