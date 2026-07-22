@@ -2,6 +2,7 @@ package com.example.marluse.clientes.controller;
 
 import com.example.marluse.clientes.dto.*;
 import com.example.marluse.clientes.service.ClienteService;
+import com.example.marluse.clientes.service.ObservacaoClienteService;
 import com.example.marluse.financeiro.dto.AbatimentoRequest;
 import com.example.marluse.financeiro.dto.AbatimentoResultado;
 import com.example.marluse.financeiro.dto.AbatimentoResumo;
@@ -11,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +26,7 @@ public class ClienteController {
 
     private final ClienteService clienteService;
     private final AbatimentoService abatimentoService;
+    private final ObservacaoClienteService observacaoService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<ClienteResponse>> criar(@Valid @RequestBody ClienteRequest request) {
@@ -63,6 +67,27 @@ public class ClienteController {
     public ResponseEntity<ApiResponse<Void>> estornar(@PathVariable String abatimentoId) {
         abatimentoService.estornar(abatimentoId);
         return ResponseEntity.ok(ApiResponse.ok("Abatimento estornado com sucesso", null));
+    }
+
+    @PostMapping("/{id}/observacoes")
+    public ResponseEntity<ApiResponse<ObservacaoResponse>> criarObservacao(
+            @PathVariable String id,
+            @Valid @RequestBody ObservacaoRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        ObservacaoResponse response = observacaoService.criar(id, request, userDetails.getUsername());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Observação registrada com sucesso", response));
+    }
+
+    @GetMapping("/{id}/observacoes")
+    public ResponseEntity<ApiResponse<List<ObservacaoResponse>>> listarObservacoes(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.ok(observacaoService.listar(id)));
+    }
+
+    @DeleteMapping("/observacoes/{observacaoId}")
+    public ResponseEntity<ApiResponse<Void>> deletarObservacao(@PathVariable String observacaoId) {
+        observacaoService.deletar(observacaoId);
+        return ResponseEntity.ok(ApiResponse.ok("Observação removida com sucesso", null));
     }
 
     @PutMapping("/{id}")
