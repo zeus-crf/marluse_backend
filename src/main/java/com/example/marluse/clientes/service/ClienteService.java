@@ -3,6 +3,7 @@ package com.example.marluse.clientes.service;
 import com.example.marluse.clientes.dto.*;
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
+import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
 import com.example.marluse.vendas.repository.PedidoRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,6 +22,7 @@ public class ClienteService {
     private final ClienteRepository clienteRepository;
     private final PedidoRepository pedidoRepository;
     private final LocacaoRepository locacaoRepository;
+    private final LancamentoFinanceiroRepository lancamentoFinanceiroRepository;
 
     public ClienteResponse criar(ClienteRequest request) {
         if (request.cpfCnpj() != null && clienteRepository.existsByCpfCnpj(request.cpfCnpj())) {
@@ -64,6 +66,34 @@ public class ClienteService {
         return clienteRepository.findById(id)
                 .map(ClienteResponse::from)
                 .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
+    }
+
+    public ClienteSaldoResponse saldoCliente(String id) {
+        Cliente cliente = clienteRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
+
+        BigDecimal saldoDevedor = lancamentoFinanceiroRepository.saldoDevedorPorCliente(cliente.getId());
+
+        List<ClienteSaldoResponse.ItemDevido> itens =
+                lancamentoFinanceiroRepository.findEmAbertoPorClienteFifo(cliente.getId())
+                        .stream()
+                        .map(l -> {
+                            boolean ehPedido = l.getPedido() != null;
+                            var origem = ehPedido ? l.getPedido() : null;
+                            var loc = l.getLocacao();
+                            return new ClienteSaldoResponse.ItemDevido(
+                                    ehPedido ? "PEDIDO" : "LOCAÇÂO",
+                                    ehPedido ? l.getPedido().getId() : (loc != null ? loc.getId() : null),
+                                    ehPedido ? l.getPedido().getNumero() : (loc != null ? loc.getNumero() : null),
+                                    ehPedido ? l.getPedido().getDataMovimento() : (loc != null ? loc.getDataMovimento() : null),
+                                    l.getValor(),
+                                    l.getValorPago(),
+                                    l.getValor().subtract(l.getValorPago())
+                            );
+                        })
+                        .toList();
+
+        return new ClienteSaldoResponse(saldoDevedor, itens);
     }
 
 
