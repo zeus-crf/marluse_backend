@@ -3,6 +3,8 @@ package com.example.marluse.clientes.service;
 import com.example.marluse.clientes.dto.*;
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
+import com.example.marluse.financeiro.model.LancamentoFinanceiro;
+import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
 import com.example.marluse.vendas.repository.PedidoRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,6 +23,7 @@ public class ClienteService {
     private final ClienteRepository clienteRepository;
     private final PedidoRepository pedidoRepository;
     private final LocacaoRepository locacaoRepository;
+    private final LancamentoFinanceiroRepository lancamentoFinanceiroRepository;
 
     public ClienteResponse criar(ClienteRequest request) {
         if (request.cpfCnpj() != null && clienteRepository.existsByCpfCnpj(request.cpfCnpj())) {
@@ -64,6 +67,48 @@ public class ClienteService {
         return clienteRepository.findById(id)
                 .map(ClienteResponse::from)
                 .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
+    }
+
+    public ClienteSaldoResponse saldoCliente(String id) {
+        Cliente cliente = clienteRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Cliente não encontrado"));
+
+        BigDecimal saldoDevedor = lancamentoFinanceiroRepository.saldoDevedorPorCliente(cliente.getId());
+
+        List<ClienteSaldoResponse.ItemDevido> itens =
+                lancamentoFinanceiroRepository.findEmAbertoPorClienteFifo(cliente.getId())
+                        .stream()
+                        .map(this::toItemDevido)
+                        .toList();
+
+        return new ClienteSaldoResponse(saldoDevedor, itens);
+    }
+
+    /**
+     * Converte um lançamento em aberto na linha que a tela exibe. A origem pode ser um pedido,
+     * uma locação ou — quando a receita foi lançada direto no financeiro para um cliente — o
+     * próprio lançamento, que não tem número nem data de movimento.
+     */
+    private ClienteSaldoResponse.ItemDevido toItemDevido(LancamentoFinanceiro l) {
+        BigDecimal saldo = l.getValor().subtract(l.getValorPago());
+
+        if (l.getPedido() != null) {
+            var pedido = l.getPedido();
+            return new ClienteSaldoResponse.ItemDevido(
+                    "PEDIDO", pedido.getId(), pedido.getNumero(), pedido.getDataMovimento(),
+                    l.getValor(), l.getValorPago(), saldo);
+        }
+
+        if (l.getLocacao() != null) {
+            var locacao = l.getLocacao();
+            return new ClienteSaldoResponse.ItemDevido(
+                    "LOCACAO", locacao.getId(), locacao.getNumero(), locacao.getDataMovimento(),
+                    l.getValor(), l.getValorPago(), saldo);
+        }
+
+        return new ClienteSaldoResponse.ItemDevido(
+                "LANCAMENTO", l.getId(), null, l.getDataVencimento(),
+                l.getValor(), l.getValorPago(), saldo);
     }
 
 

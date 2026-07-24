@@ -35,6 +35,10 @@ public class LancamentoFinanceiro extends BaseEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal valor;
 
+    @Builder.Default
+    @Column(name = "valor_pago", nullable = false, precision = 10, scale = 2)
+    private BigDecimal valorPago = BigDecimal.ZERO;
+
     @Column(name = "data_vencimento")
     private LocalDate dataVencimento;
 

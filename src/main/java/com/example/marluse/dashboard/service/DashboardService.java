@@ -6,6 +6,7 @@ import com.example.marluse.dashboard.dto.EstoqueCriticoResponse;
 import com.example.marluse.dashboard.dto.GraficoItemResponse;
 import com.example.marluse.dashboard.dto.LocacaoEmCursoResponse;
 import com.example.marluse.estoque.repository.ProdutoRepository;
+import com.example.marluse.financeiro.repository.AbatimentoRepository;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.locacoes.enums.StatusLocacao;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
@@ -32,6 +33,7 @@ public class DashboardService {
     private final LocacaoRepository locacaoRepository;
     private final ClienteRepository clienteRepository;
     private final LancamentoFinanceiroRepository lancamentoRepository;
+    private final AbatimentoRepository abatimentoRepository;
     private final ProdutoRepository produtoRepository;
 
     public DashboardKpisResponse getKpis(LocalDate inicio, LocalDate fim){
@@ -39,7 +41,9 @@ public class DashboardService {
         LocalDateTime inicioDt = inicio.atStartOfDay();
         LocalDateTime fimDt = fim.atStartOfDay();
 
-        BigDecimal receitaPeriodo = lancamentoRepository.somarReceitaPorPeriodo(inicio, fim);
+        // Receita = parcelas quitadas à vista + abatimentos de dívida recebidos no período
+        BigDecimal receitaPeriodo = lancamentoRepository.somarReceitaPorPeriodo(inicio, fim)
+                .add(abatimentoRepository.somarAbatimentosPorPeriodo(inicio, fim));
         long clientesAtivos = clienteRepository.countByAtivoTrue();
 
 

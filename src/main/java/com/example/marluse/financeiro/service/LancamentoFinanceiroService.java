@@ -9,6 +9,7 @@ import com.example.marluse.financeiro.dto.ResumoDiaResponse;
 import com.example.marluse.financeiro.enums.StatusLancamento;
 import com.example.marluse.financeiro.enums.TipoLancamento;
 import com.example.marluse.financeiro.model.LancamentoFinanceiro;
+import com.example.marluse.financeiro.repository.AbatimentoRepository;
 import com.example.marluse.financeiro.repository.LancamentoFinanceiroRepository;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.vendas.model.Pedido;
@@ -29,6 +30,8 @@ public class LancamentoFinanceiroService {
 
     private final LancamentoFinanceiroRepository lancamentoFinanceiroRepository;
     private final ClienteRepository clienteRepository;
+    private final AbatimentoRepository abatimentoRepository;
+    private final AbatimentoService abatimentoService;
 
     @Transactional
     public LancamentoFinanceiroResponse criar(LancamentoFinanceiroRequest request) {
@@ -103,6 +106,12 @@ public class LancamentoFinanceiroService {
             throw new IllegalArgumentException( "Esse lançamento já está pago");
         }
 
+        // Parcela já parcialmente abatida: o saldo restante precisa virar um Abatimento, senão
+        // ficaria fora tanto da soma por valor (excluída por valorPago > 0) quanto dos abatimentos.
+        if (lancamento.getValorPago().signum() > 0 && lancamento.getCliente() != null) {
+            abatimentoService.registrarQuitacao(lancamento, "Quitação de saldo em aberto");
+        }
+
         lancamento.setStatus(StatusLancamento.PAGO);
         lancamento.setDataPagamento(LocalDate.now());
         lancamentoFinanceiroRepository.save(lancamento);
@@ -137,7 +146,10 @@ public class LancamentoFinanceiroService {
 
     public ResumoDiaResponse resumoDia(){
         LocalDate hoje = LocalDate.now();
-        BigDecimal receitas = lancamentoFinanceiroRepository.somarPorTipoEData(TipoLancamento.RECEITA, hoje);
+        // Receita do dia = parcelas quitadas à vista (valorPago = 0) + abatimentos recebidos hoje.
+        // As duas fontes são mutuamente exclusivas, então não há dupla contagem.
+        BigDecimal receitas = lancamentoFinanceiroRepository.somarPorTipoEData(TipoLancamento.RECEITA, hoje)
+                .add(abatimentoRepository.somarAbatimentosPorPeriodo(hoje, hoje));
         BigDecimal despesas = lancamentoFinanceiroRepository.somarPorTipoEData(TipoLancamento.DESPESA, hoje);
 
         BigDecimal saldo = receitas.subtract(despesas);
