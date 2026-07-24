@@ -23,6 +23,7 @@ public class ProdutoService {
     private final FornecedorService fornecedorService;
 
 
+    @Transactional
     public ProdutoResponse criar(ProdutoRequest request){
         if (produtoRepository.findByNome(request.nome()).isPresent()){
             throw new IllegalArgumentException("Esse produto já exite");

@@ -1,7 +1,6 @@
 package com.example.marluse.estoque.dto;
 
 import com.example.marluse.estoque.enums.UnidadeMedida;
-import jakarta.persistence.Column;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
