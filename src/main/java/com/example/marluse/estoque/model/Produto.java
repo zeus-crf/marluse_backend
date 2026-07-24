@@ -7,8 +7,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "produtos")
@@ -59,11 +59,17 @@ public class Produto extends BaseEntity {
 
 
     @Builder.Default
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "produto_fornecedores",
-            joinColumns = @JoinColumn(name = "produto_id"),
-            inverseJoinColumns = @JoinColumn(name = "fornecedor_id")
-    )
-    private Set<Fornecedor> fornecedores = new LinkedHashSet<>();
+    @OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProdutoFornecedor> fornecedores = new ArrayList<>();
+
+    /** Remove todos os vínculos (orphanRemoval apaga do banco). */
+    public void limparFornecedores() {
+        this.fornecedores.clear();
+    }
+
+    /** Adiciona um vínculo mantendo os dois lados da relação em sincronia. */
+    public void addFornecedor(ProdutoFornecedor pf) {
+        pf.setProduto(this);
+        this.fornecedores.add(pf);
+    }
 }

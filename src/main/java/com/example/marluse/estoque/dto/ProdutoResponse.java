@@ -1,10 +1,10 @@
 package com.example.marluse.estoque.dto;
 
 import com.example.marluse.estoque.enums.UnidadeMedida;
-import com.example.marluse.estoque.model.Fornecedor;
 import com.example.marluse.estoque.model.Produto;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 
 public record ProdutoResponse(
@@ -21,7 +21,7 @@ public record ProdutoResponse(
         UnidadeMedida medida,
         CategoriaProduto categoria,
         boolean rascunho,
-        List<String> fornecedores
+        List<ProdutoFornecedorResponse> fornecedores
 ) {
     public static ProdutoResponse from(Produto produto){
         return new ProdutoResponse(
@@ -39,8 +39,9 @@ public record ProdutoResponse(
                 produto.getCategoria(),
                 produto.isRascunho(),
                 produto.getFornecedores().stream()
-                        .map(Fornecedor::getNome)
-                        .sorted(String.CASE_INSENSITIVE_ORDER)
+                        .map(ProdutoFornecedorResponse::from)
+                        .sorted(Comparator.comparing(
+                                ProdutoFornecedorResponse::nome, String.CASE_INSENSITIVE_ORDER))
                         .toList()
         );
     }

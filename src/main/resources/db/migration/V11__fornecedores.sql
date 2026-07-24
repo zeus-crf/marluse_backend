@@ -12,9 +12,14 @@ CREATE TABLE fornecedores (
 );
 
 CREATE TABLE produto_fornecedores (
-    produto_id    VARCHAR(36) NOT NULL,
-    fornecedor_id VARCHAR(36) NOT NULL,
-    PRIMARY KEY (produto_id, fornecedor_id),
+    id            VARCHAR(36)   NOT NULL,
+    produto_id    VARCHAR(36)   NOT NULL,
+    fornecedor_id VARCHAR(36)   NOT NULL,
+    preco_compra  DECIMAL(10,2) NULL,
+    created_at    DATETIME      NULL,
+    updated_at    DATETIME      NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_produto_fornecedor UNIQUE (produto_id, fornecedor_id),
     CONSTRAINT fk_pf_produto    FOREIGN KEY (produto_id)    REFERENCES produtos (id),
     CONSTRAINT fk_pf_fornecedor FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
 );

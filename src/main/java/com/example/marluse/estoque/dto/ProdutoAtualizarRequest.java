@@ -20,6 +20,6 @@ public record ProdutoAtualizarRequest(
         Integer estoqueMinimo,
         UnidadeMedida medida,
         CategoriaProduto categoria,
-        List<String> fornecedores
+        List<ProdutoFornecedorRequest> fornecedores
 ) {
 }

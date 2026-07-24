@@ -2,10 +2,13 @@ package com.example.marluse.estoque.service;
 
 import com.example.marluse.estoque.dto.CategoriaProduto;
 import com.example.marluse.estoque.dto.ProdutoAtualizarRequest;
+import com.example.marluse.estoque.dto.ProdutoFornecedorRequest;
 import com.example.marluse.estoque.dto.ProdutoRequest;
 import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.enums.UnidadeMedida;
+import com.example.marluse.estoque.model.Fornecedor;
 import com.example.marluse.estoque.model.Produto;
+import com.example.marluse.estoque.model.ProdutoFornecedor;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
@@ -40,11 +43,32 @@ public class ProdutoService {
                 .ativo(true)
                 .medida(request.medida())
                 .categoria(request.categoria() != null ? request.categoria() : CategoriaProduto.OUTROS)
-                .fornecedores(fornecedorService.resolverPorNomes(request.fornecedores()))
                 .build();
+
+        aplicarFornecedores(produto, request.fornecedores());
 
         return ProdutoResponse.from(produtoRepository.save(produto));
 
+    }
+
+    /**
+     * Aplica ao produto a lista de linhas fornecedor+preço vinda da requisição.
+     * Substitui o conjunto inteiro: limpa os vínculos atuais (orphanRemoval apaga
+     * do banco) e recria a partir dos nomes, resolvendo cada fornecedor (criar-na-hora).
+     * Linha nula ou sem nome é ignorada.
+     */
+    private void aplicarFornecedores(Produto produto, List<ProdutoFornecedorRequest> linhas) {
+        produto.limparFornecedores();
+        if (linhas == null) return;
+        for (ProdutoFornecedorRequest linha : linhas) {
+            if (linha == null || linha.nome() == null || linha.nome().isBlank()) continue;
+            Fornecedor fornecedor = fornecedorService.resolverPorNomes(List.of(linha.nome()))
+                    .iterator().next();
+            produto.addFornecedor(ProdutoFornecedor.builder()
+                    .fornecedor(fornecedor)
+                    .precoCompra(linha.precoCompra())
+                    .build());
+        }
     }
 
     @Transactional
@@ -103,7 +127,7 @@ public class ProdutoService {
         if (request.medida() != null) produto.setMedida(request.medida());
         if (request.quantidadeEstoque() != null) produto.setQuantidadeEstoque(request.quantidadeEstoque());
         if (request.categoria() != null ) produto.setCategoria(request.categoria());
-        if (request.fornecedores() != null) produto.setFornecedores(fornecedorService.resolverPorNomes(request.fornecedores()));
+        if (request.fornecedores() != null) aplicarFornecedores(produto, request.fornecedores());
 
         produto.setEstoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0);
 

@@ -38,6 +38,6 @@ public record ProdutoRequest(
         @NotNull(message = "Categoria é obrigatória")
         CategoriaProduto categoria,
 
-        List<String> fornecedores
+        List<ProdutoFornecedorRequest> fornecedores
 ) {
 }
