@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record ProdutoRequest(
         @NotBlank(message = "Nome é obrigatório")
@@ -36,6 +37,8 @@ public record ProdutoRequest(
         UnidadeMedida medida,
 
         @NotNull(message = "Categoria é obrigatória")
-        CategoriaProduto categoria
+        CategoriaProduto categoria,
+
+        List<String> fornecedores
 ) {
 }

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record ProdutoAtualizarRequest(
 
@@ -18,6 +19,7 @@ public record ProdutoAtualizarRequest(
         BigDecimal quantidadeEstoque,
         Integer estoqueMinimo,
         UnidadeMedida medida,
-        CategoriaProduto categoria
+        CategoriaProduto categoria,
+        List<String> fornecedores
 ) {
 }
