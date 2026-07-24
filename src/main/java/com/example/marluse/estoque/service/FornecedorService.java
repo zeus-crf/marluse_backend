@@ -3,6 +3,7 @@ package com.example.marluse.estoque.service;
 import com.example.marluse.estoque.dto.FornecedorResponse;
 import com.example.marluse.estoque.model.Fornecedor;
 import com.example.marluse.estoque.repository.FornecedorRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,8 @@ public class FornecedorService {
                 .toList();
     }
 
-    public Set<Fornecedor> resolverPorNome(List<String> nomes) {
+    @Transactional
+    public Set<Fornecedor> resolverPorNomes(List<String> nomes) {
         if (nomes == null) {
             return new LinkedHashSet<>();
         }

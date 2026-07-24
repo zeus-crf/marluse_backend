@@ -1,8 +1,8 @@
-package com.example.marluse.fornecedores;
+package com.example.marluse.estoque;
 
-import com.example.marluse.fornecedores.model.Fornecedor;
-import com.example.marluse.fornecedores.repository.FornecedorRepository;
-import com.example.marluse.fornecedores.service.FornecedorService;
+import com.example.marluse.estoque.model.Fornecedor;
+import com.example.marluse.estoque.repository.FornecedorRepository;
+import com.example.marluse.estoque.service.FornecedorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

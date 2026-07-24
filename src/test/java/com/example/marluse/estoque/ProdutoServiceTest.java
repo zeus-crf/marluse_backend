@@ -7,7 +7,7 @@ import com.example.marluse.estoque.dto.ProdutoResponse;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.estoque.service.ProdutoService;
-import com.example.marluse.fornecedores.repository.FornecedorRepository;
+import com.example.marluse.estoque.repository.FornecedorRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.BeforeEach;
