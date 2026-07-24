@@ -20,6 +20,7 @@ import java.util.List;
 public class ProdutoService {
 
     private final ProdutoRepository produtoRepository;
+    private final FornecedorService fornecedorService;
 
 
     public ProdutoResponse criar(ProdutoRequest request){
@@ -38,6 +39,7 @@ public class ProdutoService {
                 .ativo(true)
                 .medida(request.medida())
                 .categoria(request.categoria() != null ? request.categoria() : CategoriaProduto.OUTROS)
+                .fornecedores(fornecedorService.resolverPorNomes(request.fornecedores()))
                 .build();
 
         return ProdutoResponse.from(produtoRepository.save(produto));
@@ -100,6 +102,7 @@ public class ProdutoService {
         if (request.medida() != null) produto.setMedida(request.medida());
         if (request.quantidadeEstoque() != null) produto.setQuantidadeEstoque(request.quantidadeEstoque());
         if (request.categoria() != null ) produto.setCategoria(request.categoria());
+        if (request.fornecedores() != null) produto.setFornecedores(fornecedorService.resolverPorNomes(request.fornecedores()));
 
         produto.setEstoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0);
 
