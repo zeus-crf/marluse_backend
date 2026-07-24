@@ -1,1308 +1,521 @@
-# Fornecedores em Produtos (N:N) — Implementation Plan
+# Fornecedores em Produtos (com preço por fornecedor) — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Permitir associar vários fornecedores a um produto, digitando os nomes direto no modal de cadastro/edição do produto — criando o fornecedor na hora quando o nome ainda não existir.
+**Goal:** Associar vários fornecedores a um produto, cada vínculo com um preço de compra opcional; permitir montar/editar essa lista no modal de produto e visualizar tudo num modal de detalhe do produto.
 
-**Architecture:** Fornecedor vira uma entidade própria mínima (`id`, `nome` único, `ativo`) num pacote novo `fornecedores`, espelhando a estrutura de `clientes`. O vínculo com produto é um `@ManyToMany` puro (tabela `produto_fornecedores`, sem colunas extras) — deliberadamente **sem preço por fornecedor**, para não criar uma segunda fonte de verdade ao lado de `Produto.valorCompra`, que alimenta o cálculo de custo/lucro em vendas. As DTOs trafegam **nomes**, não ids: o frontend nunca manipula id de fornecedor, o que torna o "criar-na-hora" trivial. Toda a normalização (trim, dedup ignorando caixa, buscar-ou-criar) fica concentrada num único método, `FornecedorService.resolverPorNomes`, que é o único ponto de contato do `ProdutoService` com fornecedores.
+**Architecture:** O vínculo produto↔fornecedor é uma **entidade de junção** `ProdutoFornecedor` (`produto_id`, `fornecedor_id`, `preco_compra` nullable), não uma tabela N:N pura — é o que permite guardar preço por par e preços distintos do mesmo fornecedor em produtos diferentes. `Produto` mapeia `@OneToMany(cascade=ALL, orphanRemoval=true)`, então adicionar/remover linha no modal reflete direto no banco. As DTOs trafegam **nomes** de fornecedor + preço; o `ProdutoService` resolve nome→`Fornecedor` via `FornecedorService.resolverPorNomes` (criar-na-hora) e monta os vínculos. `preco_compra` é **independente** de `Produto.valorCompra` — não toca custo/lucro.
 
-**Tech Stack:** Backend Spring Boot 3 / Java 17 / JPA / Lombok (MySQL em dev via `ddl-auto: update`, Flyway apenas no perfil docker) / JUnit 5 + `@SpringBootTest` com H2 (`profile=test`). Frontend Angular 22 standalone + PrimeNG 21 + Tailwind, testes com Vitest (`@angular/build:unit-test`).
+**Tech Stack:** Backend Spring Boot / Java / JPA / Lombok (MySQL dev via `ddl-auto: update`, Flyway só no perfil docker) / JUnit 5 + `@SpringBootTest` H2 (`profile=test`). Frontend Angular 22 standalone + PrimeNG 21 + Tailwind, testes Vitest (`@angular/build:unit-test`, rodar com `npx ng test --watch=false`).
 
-**Spec:** `marluse-frontend/docs/superpowers/specs/2026-07-24-fornecedor-produto-design.md`
+**Spec:** `docs/superpowers/specs/2026-07-24-fornecedor-produto-design.md`
 
-**Decisões travadas (confirmadas com o usuário):**
-- N:N (vários fornecedores por produto), **sem** preço por fornecedor no vínculo.
-- Fornecedor guarda **apenas o nome** (mais `ativo` para soft-delete futuro).
-- Campo **opcional**, sem backfill: produtos existentes ficam sem fornecedor.
-- Aparece **somente** no modal de cadastro/edição de produto.
-- UX: multi-select com chips e criação por digitação.
-- **Sem** tela de gestão de fornecedores nesta entrega.
+**Ambiente:** o `pom.xml` pede Java 21, mas o PATH do shell tem só 17. Rodar Maven com `JAVA_HOME="/c/Users/Miguel/.jdks/corretto-24.0.2" ./mvnw ...`.
 
-**Fora de escopo (não implementar):** tela/CRUD de fornecedores, renomear/excluir fornecedor, coluna de fornecedor na listagem de estoque, filtro por fornecedor, dados de contato (telefone/CNPJ/e-mail).
+**Decisões travadas:** vários fornecedores por produto; preço por vínculo, opcional, independente de `valorCompra`; preço por par (produto, fornecedor); vínculo opcional sem backfill; lista editável (fornecedor **e** preço) no modal; modal de view com botão "ver" separado do "editar"; sem tela global de fornecedores.
 
-**Limitação conhecida (aceita, não tratar):** duas requisições simultâneas criando o mesmo fornecedor novo podem passar as duas pelo lookup antes de qualquer insert; a segunda viola a `UNIQUE` e aquele salvamento de produto falha. O operador tenta de novo e funciona. **Não implemente tratamento de corrida** — capturar `DataIntegrityViolationException` e refazer o lookup no `catch` *não funciona*, porque depois de um flush falhar o Hibernate marca a transação como rollback-only e o `EntityManager` fica inutilizável; a solução correta exigiria `REQUIRES_NEW`, que não se justifica para este volume de uso.
+**Descartado:** o componente `multi-select-create` (chips de `string[]`) — não comporta preço. Removido.
 
-**Armadilha central deste plano:** `ProdutoResponse.from()` roda **fora de transação** hoje. Adicionar uma coleção `LAZY` a `Produto` sem `@EntityGraph` nos finders produz `LazyInitializationException` em runtime — e o teste com H2 pode não pegar isso se o teste estiver dentro de `@Transactional`. A Task 5 trata isso explicitamente.
+---
+
+## Estado atual (o que já foi feito)
+
+| Item | Status |
+|---|---|
+| Migration `V11` (fornecedores + produto_fornecedores com `preco_compra`, `id`, unique) | ✅ feito |
+| `Fornecedor` (model), `FornecedorRepository`, `FornecedorService.resolverPorNomes` | ✅ feito, 10 testes verdes |
+| `FornecedorResponse`, `FornecedorController` (`GET /api/fornecedores`) | ✅ feito |
+| `ProdutoServiceTest` — 8 testes de fornecedor+preço (fase RED) | ✅ escrito, falha por DTOs ausentes |
+| Frontend: models, `fornecedor.service.ts` | ⚠️ existe, mas ainda com contrato antigo (`string[]`) |
+| Frontend: 7 specs legados corrigidos | ✅ feito |
+
+O `FornecedorService` e seus testes **não mudam**. O que falta é a entidade de junção, os DTOs de vínculo, o wiring no `ProdutoService`, e todo o frontend do editor + modal de view.
 
 ---
 
 ## Convenções de path
 
-- **Backend** (raiz `marluse/`): pacote base `src/main/java/com/example/marluse`, testes `src/test/java/com/example/marluse`, migrações `src/main/resources/db/migration`.
-- **Frontend** (raiz `marluse-frontend/`): `src/app`.
-
-Comandos de backend rodam a partir de `marluse/`. Comandos de frontend a partir de `marluse-frontend/`.
-
-**Perfis do backend, e por que isso importa:**
-- `test` → H2, `ddl-auto: create-drop`, **Flyway desligado**. As tabelas nascem das anotações JPA.
-- dev (default) → MySQL, `ddl-auto: update`, **Flyway desligado**. As tabelas também nascem das anotações.
-- `docker` → Flyway ligado. **A migration `V11` só é exercida aqui e em produção.**
-
-Consequência prática: os testes **não** validam o SQL da migration. Escreva a migration com cuidado e confira que ela bate exatamente com o que o JPA gera.
-
-**Segunda consequência, importante:** o H2 é *case-sensitive* em `UNIQUE`, o MySQL (collation `utf8mb4_..._ci`) é *case-insensitive*. Portanto a garantia de que `"Votorantim"` e `" votorantim "` viram um único fornecedor **tem que vir do código** (`findByNomeIgnoreCase` + dedup em `resolverPorNomes`), nunca da constraint do banco. A constraint é só a última linha de defesa.
+- **Backend** (`marluse/`): pacote base `src/main/java/com/example/marluse`, testes em `src/test/...`, migrações em `src/main/resources/db/migration`.
+- **Frontend** (`marluse-frontend/`): `src/app`.
 
 ---
 
 ## File Structure
 
 **Backend — criar:**
-- `src/main/java/com/example/marluse/fornecedores/model/Fornecedor.java` — entidade (nome, ativo).
-- `src/main/java/com/example/marluse/fornecedores/repository/FornecedorRepository.java` — lookup por nome ignorando caixa + listagem ordenada.
-- `src/main/java/com/example/marluse/fornecedores/dto/FornecedorResponse.java` — `(id, nome)`.
-- `src/main/java/com/example/marluse/fornecedores/service/FornecedorService.java` — `listar()` e `resolverPorNomes()`.
-- `src/main/java/com/example/marluse/fornecedores/controller/FornecedorController.java` — `GET /api/fornecedores`.
-- `src/main/resources/db/migration/V11__fornecedores.sql` — as duas tabelas.
-- `src/test/java/com/example/marluse/fornecedores/FornecedorServiceTest.java` — testes da normalização.
+- `estoque/model/ProdutoFornecedor.java` — entidade de junção.
+- `estoque/dto/ProdutoFornecedorRequest.java` — `(nome, precoCompra)`.
+- `estoque/dto/ProdutoFornecedorResponse.java` — `(nome, precoCompra)`.
 
 **Backend — modificar:**
-- `estoque/model/Produto.java` — `@ManyToMany Set<Fornecedor> fornecedores`.
-- `estoque/repository/ProdutoRepository.java` — `@EntityGraph` nos finders que alimentam `ProdutoResponse`.
-- `estoque/dto/ProdutoRequest.java` — `List<String> fornecedores`.
-- `estoque/dto/ProdutoAtualizarRequest.java` — `List<String> fornecedores`.
-- `estoque/dto/ProdutoResponse.java` — `List<String> fornecedores` + mapeamento em `from()`.
-- `estoque/service/ProdutoService.java` — resolve nomes no `criar` e no `atualizar`; `@Transactional` nesses dois métodos.
-- `src/test/java/com/example/marluse/estoque/ProdutoServiceTest.java` — construtores dos records ganham 1 argumento; novos testes de vínculo.
+- `estoque/model/Produto.java` — `@OneToMany List<ProdutoFornecedor>` no lugar do `@ManyToMany`.
+- `estoque/dto/ProdutoRequest.java` / `ProdutoAtualizarRequest.java` — `List<ProdutoFornecedorRequest> fornecedores`.
+- `estoque/dto/ProdutoResponse.java` — `List<ProdutoFornecedorResponse> fornecedores` + mapeamento ordenado.
+- `estoque/service/ProdutoService.java` — montar/substituir vínculos a partir dos nomes+preços.
+- `estoque/repository/ProdutoRepository.java` — `@EntityGraph` já presente; confirmar que cobre o `@OneToMany`.
 
 **Frontend — criar:**
-- `src/app/features/estoque/fornecedores.service.ts` — só `listar()`.
-- `src/app/shared/components/multi-select-create/multi-select-create.component.ts` — CVA `string[]` sobre `p-autocomplete`.
-- `src/app/shared/components/multi-select-create/multi-select-create.component.spec.ts` — teste do CVA.
+- `shared/components/produto-fornecedores-editor/produto-fornecedores-editor.component.ts` (+ `.spec.ts`).
+- `features/estoque/produto-detalhe-modal/produto-detalhe-modal.component.ts` (+ `.html`).
 
 **Frontend — modificar:**
-- `src/app/features/estoque/models/estoque.models.ts` — `fornecedores` nas 3 interfaces + correção do typo `categorira`.
-- `src/app/features/estoque/novo-produto-modal/novo-produto-modal.component.ts` — control, carga das opções, payload.
-- `src/app/features/estoque/novo-produto-modal/novo-produto-modal.component.html` — o campo.
+- `features/estoque/models/estoque.models.ts` — `fornecedores` vira `ProdutoFornecedorDto[]`.
+- `features/estoque/novo-produto-modal/*` — usar o editor no lugar do multi-select-create.
+- `features/estoque/estoque/estoque.component.ts` (+ `.html`) — estado + botão "ver" + wiring do detalhe-modal.
 
-**Frontend — NÃO tocar:** `estoque.component.ts` / `.html` (o modal se vira sozinho), `vendas.models.ts`, `locacoes.models.ts` (o campo novo na resposta é aditivo e opcional para eles).
-
----
-
-## Task 1: Baseline — garantir que a suíte compila e registrar o estado atual
-
-Sem isso não há TDD: você não saberá se uma falha é sua ou pré-existente.
-
-**Files:** nenhum (apenas execução)
-
-- [ ] **Step 1: Compilar e rodar os testes de backend**
-
-Run (em `marluse/`): `./mvnw test`
-
-Expected: BUILD SUCCESS. Anote o total de testes.
-
-Se falhar na **compilação** (construtores de record desatualizados em `ProdutoServiceTest` ou `PedidoServiceTest`), corrija os construtores para a assinatura atual **antes de seguir** e commite separadamente. Não comece a feature sobre uma suíte quebrada.
-
-- [ ] **Step 2: Rodar os testes de frontend e registrar o baseline**
-
-Run (em `marluse-frontend/`): `npm test -- --run`
-
-Expected: pode haver falhas **pré-existentes** — vários `.spec.ts` gerados pelo CLI importam símbolos que não existem mais (ex.: `estoque.component.spec.ts` importa `Estoque`, mas a classe se chama `EstoqueComponent`). **Anote quais specs falham hoje.** O critério de aceite deste plano é: o teste novo passa e **nenhuma falha nova** aparece. Não conserte os specs legados — está fora de escopo.
-
-- [ ] **Step 3: Commit (só se você precisou reparar a compilação no Step 1)**
-
-```bash
-git add src/test/java/com/example/marluse
-git commit -m "test: corrige construtores desatualizados para a suite compilar"
-```
+**Frontend — remover:**
+- `shared/components/multi-select-create/` (componente + spec).
 
 ---
 
-## Task 2: Entidade Fornecedor + repository + migration
+## Task 1: Entidade de junção `ProdutoFornecedor`
 
 **Files:**
-- Create: `marluse/src/main/java/com/example/marluse/fornecedores/model/Fornecedor.java`
-- Create: `marluse/src/main/java/com/example/marluse/fornecedores/repository/FornecedorRepository.java`
-- Create: `marluse/src/main/resources/db/migration/V11__fornecedores.sql`
-- Create: `marluse/src/test/java/com/example/marluse/fornecedores/FornecedorServiceTest.java`
+- Create: `marluse/src/main/java/com/example/marluse/estoque/model/ProdutoFornecedor.java`
 
-- [ ] **Step 1: Escrever o teste que falha**
-
-Crie `marluse/src/test/java/com/example/marluse/fornecedores/FornecedorServiceTest.java`. Neste passo ele só exercita a entidade e o repository; os testes do service entram na Task 3.
+- [ ] **Step 1: Criar a entidade**
 
 ```java
-package com.example.marluse.fornecedores;
+package com.example.marluse.estoque.model;
 
 import com.example.marluse.fornecedores.model.Fornecedor;
-import com.example.marluse.fornecedores.repository.FornecedorRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-
-@SpringBootTest
-@ActiveProfiles("test")
-public class FornecedorServiceTest {
-
-    @Autowired
-    private FornecedorRepository fornecedorRepository;
-
-    @BeforeEach
-    void setUp() {
-        fornecedorRepository.deleteAll();
-    }
-
-    @Test
-    void deveEncontrarFornecedorIgnorandoCaixa() {
-        fornecedorRepository.save(Fornecedor.builder().nome("Votorantim").build());
-
-        Optional<Fornecedor> achado = fornecedorRepository.findByNomeIgnoreCase("VOTORANTIM");
-
-        assertTrue(achado.isPresent());
-        assertEquals("Votorantim", achado.get().getNome());
-    }
-
-    @Test
-    void deveListarApenasAtivosEmOrdemAlfabetica() {
-        fornecedorRepository.save(Fornecedor.builder().nome("Tigre").build());
-        fornecedorRepository.save(Fornecedor.builder().nome("Amanco").build());
-        fornecedorRepository.save(Fornecedor.builder().nome("Inativo").ativo(false).build());
-
-        var ativos = fornecedorRepository.findByAtivoTrueOrderByNomeAsc();
-
-        assertEquals(2, ativos.size());
-        assertEquals("Amanco", ativos.get(0).getNome());
-        assertEquals("Tigre", ativos.get(1).getNome());
-    }
-}
-```
-
-- [ ] **Step 2: Rodar para verificar que falha**
-
-Run (em `marluse/`): `./mvnw test -Dtest=FornecedorServiceTest`
-
-Expected: FALHA de compilação — `package com.example.marluse.fornecedores.model does not exist`.
-
-- [ ] **Step 3: Criar a entidade**
-
-`marluse/src/main/java/com/example/marluse/fornecedores/model/Fornecedor.java`:
-
-```java
-package com.example.marluse.fornecedores.model;
-
 import com.example.marluse.shared.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
 
 @Entity
-@Table(name = "fornecedores")
+@Table(name = "produto_fornecedores",
+        uniqueConstraints = @UniqueConstraint(name = "uk_produto_fornecedor",
+                columnNames = {"produto_id", "fornecedor_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Fornecedor extends BaseEntity {
+public class ProdutoFornecedor extends BaseEntity {
 
-    @Column(nullable = false, unique = true, length = 120)
-    private String nome;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "produto_id", nullable = false)
+    private Produto produto;
 
-    @Builder.Default
-    @Column(nullable = false)
-    private boolean ativo = true;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "fornecedor_id", nullable = false)
+    private Fornecedor fornecedor;
 
-    // Fornecedor vive dentro de um Set em Produto (@ManyToMany). Sem equals/hashCode
-    // por id, dois carregamentos do mesmo fornecedor viram elementos distintos do Set
-    // e o Hibernate emite INSERTs duplicados na tabela de vínculo.
-    // hashCode constante é o padrão recomendado para entidades JPA: o id só existe
-    // após o persist, e um hashCode que muda quebra o Set em que a entidade já está.
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Fornecedor outro)) return false;
-        return getId() != null && getId().equals(outro.getId());
-    }
-
-    @Override
-    public int hashCode() {
-        return Fornecedor.class.hashCode();
-    }
+    @Column(name = "preco_compra", precision = 10, scale = 2)
+    private BigDecimal precoCompra;
 }
 ```
 
-- [ ] **Step 4: Criar o repository**
+Nota: `Fornecedor` está em `com.example.marluse.estoque.model` neste projeto (não em
+`fornecedores.model`). Ajustar o import ao pacote real antes de compilar.
 
-`marluse/src/main/java/com/example/marluse/fornecedores/repository/FornecedorRepository.java`:
+- [ ] **Step 2: Compilar**
 
-```java
-package com.example.marluse.fornecedores.repository;
-
-import com.example.marluse.fornecedores.model.Fornecedor;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
-import java.util.Optional;
-
-@Repository
-public interface FornecedorRepository extends JpaRepository<Fornecedor, String> {
-
-    Optional<Fornecedor> findByNomeIgnoreCase(String nome);
-
-    List<Fornecedor> findByAtivoTrueOrderByNomeAsc();
-}
-```
-
-- [ ] **Step 5: Rodar para verificar que passa**
-
-Run (em `marluse/`): `./mvnw test -Dtest=FornecedorServiceTest`
-
-Expected: PASS, 2 testes.
-
-- [ ] **Step 6: Criar a migration**
-
-`marluse/src/main/resources/db/migration/V11__fornecedores.sql`:
-
-```sql
--- Fornecedores de produto (N:N). Campo opcional: nenhum backfill,
--- produtos existentes simplesmente ficam sem fornecedor.
-
-CREATE TABLE fornecedores (
-    id         VARCHAR(36)  NOT NULL,
-    nome       VARCHAR(120) NOT NULL,
-    ativo      BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at DATETIME     NULL,
-    updated_at DATETIME     NULL,
-    PRIMARY KEY (id),
-    CONSTRAINT uk_fornecedor_nome UNIQUE (nome)
-);
-
-CREATE TABLE produto_fornecedores (
-    produto_id    VARCHAR(36) NOT NULL,
-    fornecedor_id VARCHAR(36) NOT NULL,
-    PRIMARY KEY (produto_id, fornecedor_id),
-    CONSTRAINT fk_pf_produto    FOREIGN KEY (produto_id)    REFERENCES produtos (id),
-    CONSTRAINT fk_pf_fornecedor FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
-);
-```
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add src/main/java/com/example/marluse/fornecedores src/main/resources/db/migration/V11__fornecedores.sql src/test/java/com/example/marluse/fornecedores
-git commit -m "feat: entidade Fornecedor e tabela de vinculo produto_fornecedores"
-```
-
----
-
-## Task 3: `FornecedorService.resolverPorNomes` — normalização e criar-na-hora
-
-Este é o coração da feature. Tudo que o operador digita passa por aqui.
-
-**Files:**
-- Create: `marluse/src/main/java/com/example/marluse/fornecedores/dto/FornecedorResponse.java`
-- Create: `marluse/src/main/java/com/example/marluse/fornecedores/service/FornecedorService.java`
-- Modify: `marluse/src/test/java/com/example/marluse/fornecedores/FornecedorServiceTest.java`
-
-- [ ] **Step 1: Escrever os testes que falham**
-
-Adicione ao `FornecedorServiceTest` (dentro da classe, junto dos testes existentes) — e acrescente os imports `java.util.List`, `java.util.Set`, `com.example.marluse.fornecedores.service.FornecedorService` e `org.springframework.beans.factory.annotation.Autowired` já presente:
-
-```java
-    @Autowired
-    private FornecedorService fornecedorService;
-
-    @Test
-    void deveCriarFornecedorQuandoNomeNaoExiste() {
-        Set<Fornecedor> resolvidos = fornecedorService.resolverPorNomes(List.of("Votorantim"));
-
-        assertEquals(1, resolvidos.size());
-        assertEquals("Votorantim", resolvidos.iterator().next().getNome());
-        assertEquals(1, fornecedorRepository.count());
-    }
-
-    @Test
-    void deveReutilizarFornecedorExistenteIgnorandoCaixaEEspacos() {
-        fornecedorRepository.save(Fornecedor.builder().nome("Votorantim").build());
-
-        Set<Fornecedor> resolvidos = fornecedorService.resolverPorNomes(List.of("  votorantim  "));
-
-        assertEquals(1, resolvidos.size());
-        assertEquals("Votorantim", resolvidos.iterator().next().getNome());
-        assertEquals(1, fornecedorRepository.count(), "não deve ter criado um segundo fornecedor");
-    }
-
-    @Test
-    void deveDeduplicarNomesRepetidosNaMesmaRequisicao() {
-        Set<Fornecedor> resolvidos =
-                fornecedorService.resolverPorNomes(List.of("Tigre", "TIGRE", " tigre "));
-
-        assertEquals(1, resolvidos.size());
-        assertEquals(1, fornecedorRepository.count());
-    }
-
-    @Test
-    void deveDescartarNomesVaziosENulos() {
-        List<String> nomes = new java.util.ArrayList<>(List.of("Tigre", "   ", ""));
-        nomes.add(null);
-
-        Set<Fornecedor> resolvidos = fornecedorService.resolverPorNomes(nomes);
-
-        assertEquals(1, resolvidos.size());
-        assertEquals("Tigre", resolvidos.iterator().next().getNome());
-    }
-
-    @Test
-    void deveRetornarConjuntoVazioParaListaNula() {
-        assertTrue(fornecedorService.resolverPorNomes(null).isEmpty());
-        assertEquals(0, fornecedorRepository.count());
-    }
-
-    @Test
-    void deveTruncarNomeAcimaDoLimite() {
-        String longo = "A".repeat(200);
-
-        Set<Fornecedor> resolvidos = fornecedorService.resolverPorNomes(List.of(longo));
-
-        assertEquals(120, resolvidos.iterator().next().getNome().length());
-    }
-
-    @Test
-    void deveListarFornecedoresAtivos() {
-        fornecedorService.resolverPorNomes(List.of("Tigre", "Amanco"));
-
-        var lista = fornecedorService.listar();
-
-        assertEquals(2, lista.size());
-        assertEquals("Amanco", lista.get(0).nome());
-        assertNotNull(lista.get(0).id());
-    }
-```
-
-- [ ] **Step 2: Rodar para verificar que falha**
-
-Run (em `marluse/`): `./mvnw test -Dtest=FornecedorServiceTest`
-
-Expected: FALHA de compilação — `FornecedorService` não existe.
-
-- [ ] **Step 3: Criar o DTO de resposta**
-
-`marluse/src/main/java/com/example/marluse/fornecedores/dto/FornecedorResponse.java`:
-
-```java
-package com.example.marluse.fornecedores.dto;
-
-import com.example.marluse.fornecedores.model.Fornecedor;
-
-public record FornecedorResponse(
-        String id,
-        String nome
-) {
-    public static FornecedorResponse from(Fornecedor fornecedor) {
-        return new FornecedorResponse(fornecedor.getId(), fornecedor.getNome());
-    }
-}
-```
-
-- [ ] **Step 4: Criar o service**
-
-`marluse/src/main/java/com/example/marluse/fornecedores/service/FornecedorService.java`:
-
-```java
-package com.example.marluse.fornecedores.service;
-
-import com.example.marluse.fornecedores.dto.FornecedorResponse;
-import com.example.marluse.fornecedores.model.Fornecedor;
-import com.example.marluse.fornecedores.repository.FornecedorRepository;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-@Service
-@RequiredArgsConstructor
-public class FornecedorService {
-
-    /** Igual ao length da coluna `nome`. */
-    private static final int NOME_MAX = 120;
-
-    private final FornecedorRepository fornecedorRepository;
-
-    public List<FornecedorResponse> listar() {
-        return fornecedorRepository.findByAtivoTrueOrderByNomeAsc()
-                .stream()
-                .map(FornecedorResponse::from)
-                .toList();
-    }
-
-    /**
-     * Converte os nomes digitados pelo operador em fornecedores persistidos.
-     * Faz trim, descarta vazios, deduplica ignorando caixa e cria os que faltam.
-     *
-     * <p>A garantia de "um único fornecedor por nome" vive aqui, e não na constraint
-     * do banco: em H2 (testes) o UNIQUE é case-sensitive, em MySQL não é.
-     */
-    @Transactional
-    public Set<Fornecedor> resolverPorNomes(List<String> nomes) {
-        if (nomes == null) {
-            return new LinkedHashSet<>();
-        }
-
-        // chave em minúsculas -> nome como o operador digitou (primeira ocorrência vence)
-        Map<String, String> unicos = new LinkedHashMap<>();
-        for (String bruto : nomes) {
-            if (bruto == null) continue;
-            String nome = bruto.trim();
-            if (nome.isEmpty()) continue;
-            if (nome.length() > NOME_MAX) nome = nome.substring(0, NOME_MAX);
-            unicos.putIfAbsent(nome.toLowerCase(), nome);
-        }
-
-        Set<Fornecedor> resolvidos = new LinkedHashSet<>();
-        for (String nome : unicos.values()) {
-            resolvidos.add(buscarOuCriar(nome));
-        }
-        return resolvidos;
-    }
-
-    /**
-     * `orElseGet` e não `orElse`: `orElse` executaria o save mesmo quando o
-     * fornecedor já existe.
-     *
-     * <p>Duas requisições simultâneas podem passar pelo lookup antes de qualquer
-     * insert; a segunda bate na UNIQUE e o salvamento do produto falha. Aceito:
-     * o operador tenta de novo e funciona, porque na segunda tentativa o
-     * fornecedor já existe. Tratar a corrida exigiria transação separada
-     * (`REQUIRES_NEW`) — depois de um flush falhar, o `EntityManager` fica
-     * inutilizável e não dá para simplesmente refazer o lookup no `catch`.
-     */
-    private Fornecedor buscarOuCriar(String nome) {
-        return fornecedorRepository.findByNomeIgnoreCase(nome)
-                .orElseGet(() -> fornecedorRepository.save(
-                        Fornecedor.builder().nome(nome).ativo(true).build()));
-    }
-}
-```
-
-- [ ] **Step 5: Rodar para verificar que passa**
-
-Run (em `marluse/`): `./mvnw test -Dtest=FornecedorServiceTest`
-
-Expected: PASS, 9 testes.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src/main/java/com/example/marluse/fornecedores src/test/java/com/example/marluse/fornecedores
-git commit -m "feat: FornecedorService com normalizacao de nomes e criar-na-hora"
-```
-
----
-
-## Task 4: Endpoint `GET /api/fornecedores`
-
-**Files:**
-- Create: `marluse/src/main/java/com/example/marluse/fornecedores/controller/FornecedorController.java`
-
-Sem teste dedicado: o controller é uma linha delegando para `FornecedorService.listar()`, já coberto na Task 3. A verificação é manual, no Step 2.
-
-- [ ] **Step 1: Criar o controller**
-
-`marluse/src/main/java/com/example/marluse/fornecedores/controller/FornecedorController.java`:
-
-```java
-package com.example.marluse.fornecedores.controller;
-
-import com.example.marluse.fornecedores.dto.FornecedorResponse;
-import com.example.marluse.fornecedores.service.FornecedorService;
-import com.example.marluse.shared.ApiResponse;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/fornecedores")
-@RequiredArgsConstructor
-public class FornecedorController {
-
-    private final FornecedorService fornecedorService;
-
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<FornecedorResponse>>> listar() {
-        return ResponseEntity.ok(ApiResponse.ok(fornecedorService.listar()));
-    }
-}
-```
-
-Não é preciso mexer no `SecurityConfig`: a regra é `anyRequest().authenticated()`, e o frontend já anexa o token via `auth.interceptor.ts`.
-
-- [ ] **Step 2: Subir a aplicação e verificar o endpoint**
-
-Run (em `marluse/`): `./mvnw spring-boot:run`
-
-Com a app no ar, faça login pelo frontend e, no DevTools do navegador (aba Console), execute:
-
-```js
-await (await fetch('/api/fornecedores', { credentials: 'include' })).json()
-```
-
-Expected: `{ success: true, data: [] }` (lista vazia — nenhum fornecedor cadastrado ainda). Um `401` significa que a sessão expirou; refaça o login.
+Run (em `marluse/`): `JAVA_HOME="/c/Users/Miguel/.jdks/corretto-24.0.2" ./mvnw -q compile`
+Expected: BUILD SUCCESS (a entidade sozinha compila; o wiring vem depois).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/java/com/example/marluse/fornecedores/controller
-git commit -m "feat: endpoint GET /api/fornecedores"
+git add src/main/java/com/example/marluse/estoque/model/ProdutoFornecedor.java
+git commit -m "feat: entidade de juncao ProdutoFornecedor com preco de compra"
 ```
 
 ---
 
-## Task 5: Vincular fornecedores ao Produto (o ponto de risco)
+## Task 2: DTOs de vínculo
+
+**Files:**
+- Create: `marluse/src/main/java/com/example/marluse/estoque/dto/ProdutoFornecedorRequest.java`
+- Create: `marluse/src/main/java/com/example/marluse/estoque/dto/ProdutoFornecedorResponse.java`
+
+- [ ] **Step 1: Request**
+
+```java
+package com.example.marluse.estoque.dto;
+
+import java.math.BigDecimal;
+
+public record ProdutoFornecedorRequest(
+        String nome,
+        BigDecimal precoCompra
+) {
+}
+```
+
+- [ ] **Step 2: Response**
+
+```java
+package com.example.marluse.estoque.dto;
+
+import com.example.marluse.estoque.model.ProdutoFornecedor;
+
+import java.math.BigDecimal;
+
+public record ProdutoFornecedorResponse(
+        String nome,
+        BigDecimal precoCompra
+) {
+    public static ProdutoFornecedorResponse from(ProdutoFornecedor pf) {
+        return new ProdutoFornecedorResponse(pf.getFornecedor().getNome(), pf.getPrecoCompra());
+    }
+}
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/main/java/com/example/marluse/estoque/dto/ProdutoFornecedorRequest.java src/main/java/com/example/marluse/estoque/dto/ProdutoFornecedorResponse.java
+git commit -m "feat: DTOs de vinculo produto-fornecedor"
+```
+
+---
+
+## Task 3: Ligar no `Produto` e nas DTOs de produto (fase GREEN)
+
+Aqui os testes já escritos (`ProdutoServiceTest`, fase RED) passam a compilar e devem ficar verdes.
 
 **Files:**
 - Modify: `marluse/src/main/java/com/example/marluse/estoque/model/Produto.java`
-- Modify: `marluse/src/main/java/com/example/marluse/estoque/repository/ProdutoRepository.java`
 - Modify: `marluse/src/main/java/com/example/marluse/estoque/dto/ProdutoRequest.java`
 - Modify: `marluse/src/main/java/com/example/marluse/estoque/dto/ProdutoAtualizarRequest.java`
 - Modify: `marluse/src/main/java/com/example/marluse/estoque/dto/ProdutoResponse.java`
-- Modify: `marluse/src/main/java/com/example/marluse/estoque/service/ProdutoService.java`
-- Modify: `marluse/src/test/java/com/example/marluse/estoque/ProdutoServiceTest.java`
 
-- [ ] **Step 1: Atualizar os construtores dos records no teste existente**
+- [ ] **Step 1: Trocar a coleção em `Produto`**
 
-`ProdutoRequest` e `ProdutoAtualizarRequest` vão de 9 para 10 componentes; sem isso o teste não compila. Em `ProdutoServiceTest`, o helper `produtoValido` (linha ~41) passa a receber os fornecedores:
+Remover o `@ManyToMany Set<Fornecedor> fornecedores` e colocar:
 
 ```java
-    private ProdutoRequest produtoValido(String nome, int quantidade) {
-        return produtoValido(nome, quantidade, List.of());
-    }
-
-    private ProdutoRequest produtoValido(String nome, int quantidade, List<String> fornecedores) {
-        return new ProdutoRequest(
-                nome, "Descrição",
-                new BigDecimal("10.00"),   // valorCompra
-                new BigDecimal("25.00"),   // preco
-                new BigDecimal("5.00"),    // precoDiaria
-                BigDecimal.valueOf(quantidade), 5,
-                UnidadeMedida.SACO,
-                CategoriaProduto.OUTROS,
-                fornecedores);
-    }
+@Builder.Default
+@OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, orphanRemoval = true)
+private List<ProdutoFornecedor> fornecedores = new ArrayList<>();
 ```
 
-E a chamada de `new ProdutoAtualizarRequest(...)` (linha ~88) ganha um último argumento `null` — que, pelo contrato de patch parcial, significa "não mexe nos fornecedores".
+Imports: `java.util.ArrayList`, `java.util.List`. Remover os imports de `Set`/`LinkedHashSet` e de `Fornecedor` se ficarem sem uso.
 
-- [ ] **Step 2: Escrever os testes que falham**
-
-Adicione ao `ProdutoServiceTest` (imports novos: `com.example.marluse.fornecedores.repository.FornecedorRepository`, `java.util.List`):
+Helper para manter os dois lados da relação em sincronia (evita `null` no `produto` do vínculo):
 
 ```java
-    @Autowired
-    private FornecedorRepository fornecedorRepository;
+public void limparFornecedores() {
+    this.fornecedores.clear();
+}
 
-    @Test
-    void deveCriarProdutoComFornecedoresNovos() {
-        ProdutoResponse response =
-                produtoService.criar(produtoValido("Cimento", 50, List.of("Votorantim", "Tigre")));
-
-        assertEquals(List.of("Tigre", "Votorantim"), response.fornecedores());
-        assertEquals(2, fornecedorRepository.count());
-    }
-
-    @Test
-    void deveReaproveitarFornecedorEntreProdutos() {
-        produtoService.criar(produtoValido("Cimento", 50, List.of("Votorantim")));
-        produtoService.criar(produtoValido("Areia", 30, List.of("votorantim")));
-
-        assertEquals(1, fornecedorRepository.count(), "mesmo fornecedor não deve ser duplicado");
-    }
-
-    @Test
-    void deveCriarProdutoSemFornecedores() {
-        ProdutoResponse response = produtoService.criar(produtoValido("Cimento", 50));
-
-        assertTrue(response.fornecedores().isEmpty());
-    }
-
-    @Test
-    void deveSubstituirOsFornecedoresNoUpdate() {
-        ProdutoResponse criado =
-                produtoService.criar(produtoValido("Cimento", 50, List.of("Votorantim")));
-
-        ProdutoResponse atualizado = produtoService.atualizar(criado.id(),
-                atualizarComFornecedores(List.of("Tigre")));
-
-        assertEquals(List.of("Tigre"), atualizado.fornecedores());
-    }
-
-    @Test
-    void deveLimparOsFornecedoresComListaVazia() {
-        ProdutoResponse criado =
-                produtoService.criar(produtoValido("Cimento", 50, List.of("Votorantim")));
-
-        ProdutoResponse atualizado = produtoService.atualizar(criado.id(),
-                atualizarComFornecedores(List.of()));
-
-        assertTrue(atualizado.fornecedores().isEmpty());
-    }
-
-    @Test
-    void devePreservarOsFornecedoresQuandoOCampoVemNulo() {
-        ProdutoResponse criado =
-                produtoService.criar(produtoValido("Cimento", 50, List.of("Votorantim")));
-
-        ProdutoResponse atualizado = produtoService.atualizar(criado.id(),
-                atualizarComFornecedores(null));
-
-        assertEquals(List.of("Votorantim"), atualizado.fornecedores());
-    }
-
-    private ProdutoAtualizarRequest atualizarComFornecedores(List<String> fornecedores) {
-        return new ProdutoAtualizarRequest(
-                "Cimento", "Descrição",
-                new BigDecimal("10.00"),
-                new BigDecimal("25.00"),
-                new BigDecimal("5.00"),
-                BigDecimal.valueOf(50), 5,
-                UnidadeMedida.SACO,
-                CategoriaProduto.OUTROS,
-                fornecedores);
-    }
-```
-
-Ajuste também o `setUp()` para limpar fornecedores — a tabela de vínculo precisa sair antes:
-
-```java
-    @BeforeEach
-    void setUp(){
-        produtoRepository.deleteAll();
-        fornecedorRepository.deleteAll();
-    }
-```
-
-- [ ] **Step 3: Rodar para verificar que falha**
-
-Run (em `marluse/`): `./mvnw test -Dtest=ProdutoServiceTest`
-
-Expected: FALHA de compilação — `ProdutoRequest` não aceita 10 argumentos e `ProdutoResponse` não tem `fornecedores()`.
-
-- [ ] **Step 4: Adicionar a coleção em `Produto`**
-
-Em `marluse/src/main/java/com/example/marluse/estoque/model/Produto.java`, adicione os imports e o campo ao final da classe, depois de `rascunho`:
-
-```java
-import com.example.marluse.fornecedores.model.Fornecedor;
-import java.util.LinkedHashSet;
-import java.util.Set;
-```
-
-```java
-    // LAZY de propósito: EAGER num @ManyToMany dispara uma query por produto na
-    // listagem de estoque. Os finders que alimentam ProdutoResponse usam @EntityGraph.
-    @Builder.Default
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "produto_fornecedores",
-            joinColumns = @JoinColumn(name = "produto_id"),
-            inverseJoinColumns = @JoinColumn(name = "fornecedor_id"))
-    private Set<Fornecedor> fornecedores = new LinkedHashSet<>();
-```
-
-`Produto` já importa `jakarta.persistence.*`, então `@ManyToMany`, `@JoinTable` e `@JoinColumn` não precisam de import novo.
-
-- [ ] **Step 5: Adicionar `@EntityGraph` nos finders**
-
-Esta é a proteção contra `LazyInitializationException`. `ProdutoResponse.from()` é chamado **fora de transação** por `listar()`, `listarRascunho()`, `burcarPorId()` e `listarEstoqueBaixo()`. O `@EntityGraph` traz a coleção já inicializada na própria query — e de quebra evita N+1.
-
-`marluse/src/main/java/com/example/marluse/estoque/repository/ProdutoRepository.java` passa a ser:
-
-```java
-package com.example.marluse.estoque.repository;
-
-import com.example.marluse.estoque.model.Produto;
-import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
-
-public interface ProdutoRepository extends JpaRepository<Produto, String> {
-
-    Optional<Produto> findByNome(String nome);
-
-    List<Produto> findByAtivoTrue();
-
-    List<Produto> findByQuantidadeEstoqueLessThanEqualAndAtivoTrue(BigDecimal quantidade);
-
-    // Os quatro finders abaixo alimentam ProdutoResponse.from(), que roda fora de
-    // transação. Sem @EntityGraph, a coleção `fornecedores` (LAZY) estoura
-    // LazyInitializationException em runtime.
-    @Override
-    @EntityGraph(attributePaths = "fornecedores")
-    Optional<Produto> findById(String id);
-
-    @EntityGraph(attributePaths = "fornecedores")
-    @Query("SELECT p FROM Produto p WHERE p.quantidadeEstoque <= p.estoqueMinimo AND p.ativo = true AND p.rascunho = false")
-    List<Produto> findEstoqueBaixo();
-
-    @EntityGraph(attributePaths = "fornecedores")
-    List<Produto> findByAtivoTrueAndRascunhoTrue();
-
-    @EntityGraph(attributePaths = "fornecedores")
-    List<Produto> findByAtivoTrueAndRascunhoFalse();
+public void addFornecedor(ProdutoFornecedor pf) {
+    pf.setProduto(this);
+    this.fornecedores.add(pf);
 }
 ```
 
-- [ ] **Step 6: Adicionar o campo nas três DTOs**
+- [ ] **Step 2: Campo nas 3 DTOs de produto**
 
-Em `ProdutoRequest.java`, adicione o import `java.util.List` e um último componente ao record (após `categoria`):
+`ProdutoRequest` e `ProdutoAtualizarRequest`: adicionar como último componente
+```java
+List<ProdutoFornecedorRequest> fornecedores
+```
+(import `java.util.List`).
+
+`ProdutoResponse`: adicionar `List<ProdutoFornecedorResponse> fornecedores` ao final e, no `from()`, mapear ordenado por nome:
 
 ```java
-        /** Nomes digitados pelo operador. Fornecedor que não existir é criado. */
-        List<String> fornecedores
+produto.getFornecedores().stream()
+        .map(ProdutoFornecedorResponse::from)
+        .sorted(java.util.Comparator.comparing(
+                ProdutoFornecedorResponse::nome, String.CASE_INSENSITIVE_ORDER))
+        .toList()
 ```
 
-Em `ProdutoAtualizarRequest.java`, mesmo import e mesmo componente ao final (após `categoria`):
+- [ ] **Step 3: Ligar no `ProdutoService`**
+
+Injetar `FornecedorService` (se ainda não estiver). Criar um helper privado que aplica a lista de linhas a um produto:
 
 ```java
-        /** null = não altera os vínculos; lista vazia = remove todos. */
-        List<String> fornecedores
+private void aplicarFornecedores(Produto produto, List<ProdutoFornecedorRequest> linhas) {
+    produto.limparFornecedores();
+    if (linhas == null) return;
+    for (ProdutoFornecedorRequest linha : linhas) {
+        if (linha == null || linha.nome() == null || linha.nome().isBlank()) continue;
+        Fornecedor fornecedor = fornecedorService.resolverPorNomes(List.of(linha.nome()))
+                .iterator().next();
+        produto.addFornecedor(ProdutoFornecedor.builder()
+                .fornecedor(fornecedor)
+                .precoCompra(linha.precoCompra())
+                .build());
+    }
+}
 ```
 
-Em `ProdutoResponse.java`, adicione os imports `com.example.marluse.fornecedores.model.Fornecedor` e `java.util.List`, o componente `List<String> fornecedores` ao final do record (após `rascunho`), e o mapeamento como último argumento do `new ProdutoResponse(...)` dentro de `from()`:
+Em `criar(...)`: após montar o `produto` (antes do `save`), chamar `aplicarFornecedores(produto, request.fornecedores())`. Manter `@Transactional`.
 
+Em `atualizar(...)`: substituir a linha antiga de fornecedores por
 ```java
-                produto.getFornecedores().stream()
-                        .map(Fornecedor::getNome)
-                        .sorted(String.CASE_INSENSITIVE_ORDER)
-                        .toList()
+if (request.fornecedores() != null) aplicarFornecedores(produto, request.fornecedores());
 ```
+`null` preserva (não chama), lista (mesmo vazia) substitui — o `limparFornecedores()` + `orphanRemoval` apaga os vínculos que sumiram.
 
-- [ ] **Step 7: Ligar no `ProdutoService`**
+- [ ] **Step 4: Rodar os testes**
 
-Em `marluse/src/main/java/com/example/marluse/estoque/service/ProdutoService.java`:
+Run (em `marluse/`): `JAVA_HOME="/c/Users/Miguel/.jdks/corretto-24.0.2" ./mvnw test -Dtest=FornecedorServiceTest,ProdutoServiceTest`
+Expected: PASS — 10 (Fornecedor) + 14 (Produto: 6 antigos + 8 de fornecedor). 24 no total.
 
-Novos imports:
+- [ ] **Step 5: Verificar lazy fora de transação**
 
-```java
-import com.example.marluse.fornecedores.service.FornecedorService;
-```
-
-Nova dependência, ao lado de `produtoRepository`:
-
-```java
-    private final FornecedorService fornecedorService;
-```
-
-Em `criar(...)`, anote o método com `@Transactional` (o import `jakarta.transaction.Transactional` já existe no arquivo) e adicione ao builder, depois de `.categoria(...)`:
-
-```java
-                .fornecedores(fornecedorService.resolverPorNomes(request.fornecedores()))
-```
-
-Em `atualizar(...)`, anote o método com `@Transactional` e adicione, junto dos outros `if` de patch parcial:
-
-```java
-        // null preserva os vínculos atuais; lista vazia remove todos.
-        if (request.fornecedores() != null) {
-            produto.setFornecedores(fornecedorService.resolverPorNomes(request.fornecedores()));
-        }
-```
-
-`criarRascunho(...)` não muda: rascunho nasce sem fornecedor, e o `@Builder.Default` já garante a coleção vazia.
-
-- [ ] **Step 8: Rodar para verificar que passa**
-
-Run (em `marluse/`): `./mvnw test -Dtest=ProdutoServiceTest`
-
-Expected: PASS, incluindo os 6 testes novos.
-
-- [ ] **Step 9: Rodar a suíte inteira**
-
-Run (em `marluse/`): `./mvnw test`
-
-Expected: BUILD SUCCESS, sem falhas novas em relação ao baseline da Task 1.
-
-- [ ] **Step 10: Verificar que não há `LazyInitializationException` fora de transação**
-
-Os testes rodam com `@Transactional` na classe, o que **mascara** o problema de lazy loading. Confirme no ambiente real:
-
-Run (em `marluse/`): `./mvnw spring-boot:run`
-
-No DevTools do navegador, logado:
-
+Run: `JAVA_HOME="..." ./mvnw spring-boot:run`, logado, no console do navegador:
 ```js
 await (await fetch('/api/produtos', { credentials: 'include' })).json()
 ```
+Expected: cada item com `"fornecedores": []`, sem erro 500. Se aparecer `LazyInitializationException`, faltou `@EntityGraph` em algum finder.
 
-Expected: `success: true` e cada item com `"fornecedores": []`. Se aparecer erro 500 com `LazyInitializationException`, o `@EntityGraph` do Step 5 não foi aplicado ao finder correspondente.
-
-- [ ] **Step 11: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/main/java/com/example/marluse/estoque src/test/java/com/example/marluse/estoque
-git commit -m "feat: vincula fornecedores ao produto (N:N) no create e no update"
+git add src/main/java/com/example/marluse/estoque src/test/java/com/example/marluse/estoque src/main/resources/db/migration/V11__fornecedores.sql
+git commit -m "feat: vincula fornecedores com preco ao produto (create e update)"
 ```
 
 ---
 
-## Task 6: Frontend — models e service
+## Task 4: Frontend — models e service no novo contrato
 
 **Files:**
 - Modify: `marluse-frontend/src/app/features/estoque/models/estoque.models.ts`
-- Create: `marluse-frontend/src/app/features/estoque/fornecedores.service.ts`
+- Modify: `marluse-frontend/src/app/features/estoque/fornecedor/fornecedor.service.ts`
 
-- [ ] **Step 1: Adicionar `fornecedores` às interfaces e corrigir o typo**
-
-Em `estoque.models.ts`, adicione `fornecedores` a `ProdutoRequest` (após `categoria`), a `ProdutoResponse` (após `rascunho`) e a `ProdutoAtualizarRequest`. Em `ProdutoResponse` o campo é obrigatório: o backend sempre devolve ao menos uma lista vazia.
+- [ ] **Step 1: Tipo de vínculo nos models**
 
 ```ts
-export interface ProdutoRequest {
-  // …campos existentes…
-  categoria: CategoriaProduto;
-  fornecedores?: string[];
-}
-
-export interface ProdutoResponse {
-  // …campos existentes…
-  rascunho: boolean;
-  fornecedores: string[];
-}
-```
-
-Em `ProdutoAtualizarRequest`, **corrija também o typo `categorira` → `categoria`**. Isso é um bug real, não cosmético: o formulário sempre enviou `categoria`, então o tipo descreve um payload que nunca existiu.
-
-```ts
-export interface ProdutoAtualizarRequest {
+export interface ProdutoFornecedorDto {
   nome: string;
-  descricao?: string;
-  valorCompra: number;
-  preco: number;
-  precoDiaria: number;
-  estoqueMinimo: number;
-  quantidadeEstoque: number;
-  medida: UnidadeMedida;
-  categoria: CategoriaProduto;
-  fornecedores?: string[];
+  precoCompra: number | null;
 }
 ```
 
-- [ ] **Step 2: Criar o service**
+Nas 3 interfaces (`ProdutoRequest`, `ProdutoResponse`, `ProdutoAtualizarRequest`), `fornecedores` passa de `string[]` para `ProdutoFornecedorDto[]` (opcional em Request/Atualizar; obrigatório em Response).
 
-`marluse-frontend/src/app/features/estoque/fornecedores.service.ts` — segue o padrão de `estoque.service.ts` (desembrulha o `data` do `ApiResponse`):
+- [ ] **Step 2: Confirmar o service**
 
-```ts
-import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
-import { environment } from '../../../environments/environment';
+`fornecedor.service.ts` continua com `listar()` devolvendo `FornecedorResponse[]` (`{id, nome}`) — usado só para as sugestões de nome. Sem mudança de contrato.
 
-export interface FornecedorResponse {
-  id: string;
-  nome: string;
-}
-
-@Injectable({ providedIn: 'root' })
-export class FornecedoresService {
-  private http    = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/fornecedores`;
-
-  listar(): Observable<FornecedorResponse[]> {
-    return this.http.get<{ data: FornecedorResponse[] }>(this.baseUrl).pipe(map(r => r.data));
-  }
-}
-```
-
-Atenção ao número de `../` no import de `environment`: este arquivo fica em `features/estoque/`, um nível acima de `features/estoque/estoque/`, então são **três** `../`, não quatro.
-
-- [ ] **Step 3: Verificar que compila**
+- [ ] **Step 3: Typecheck**
 
 Run (em `marluse-frontend/`): `npx tsc -p tsconfig.app.json --noEmit`
-
-Expected: nenhum erro. Se aparecer erro em `novo-produto-modal.component.ts` sobre `categorira`, é a correção do typo surtindo efeito — o objeto de payload já usa `categoria`, então nada mais precisa mudar ali.
+Expected: erros no modal (ainda usa contrato antigo) — resolvidos na Task 6. Nos models em si, sem erro.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/app/features/estoque/models/estoque.models.ts src/app/features/estoque/fornecedores.service.ts
-git commit -m "feat: modelo e service de fornecedores no frontend"
+git add src/app/features/estoque/models/estoque.models.ts
+git commit -m "feat: tipo ProdutoFornecedorDto no frontend"
 ```
 
 ---
 
-## Task 7: Componente `multi-select-create`
+## Task 5: Componente `produto-fornecedores-editor`
 
-O `app-select-search` existente é single-select (`p-select`) e não aceita valor novo. O campo de fornecedores precisa de chips + digitação livre, o que pede `p-autocomplete` com `[multiple]`.
+Lista editável de linhas (fornecedor + preço), CVA que emite `ProdutoFornecedorDto[]`.
 
 **Files:**
-- Create: `marluse-frontend/src/app/shared/components/multi-select-create/multi-select-create.component.ts`
-- Create: `marluse-frontend/src/app/shared/components/multi-select-create/multi-select-create.component.spec.ts`
+- Create: `marluse-frontend/src/app/shared/components/produto-fornecedores-editor/produto-fornecedores-editor.component.ts`
+- Create: `marluse-frontend/src/app/shared/components/produto-fornecedores-editor/produto-fornecedores-editor.component.spec.ts`
+- Remove: `marluse-frontend/src/app/shared/components/multi-select-create/`
 
-- [ ] **Step 1: Escrever o teste que falha**
-
-`marluse-frontend/src/app/shared/components/multi-select-create/multi-select-create.component.spec.ts`:
+- [ ] **Step 1: Escrever o teste (RED)**
 
 ```ts
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { MultiSelectCreateComponent } from './multi-select-create.component';
+import { ProdutoFornecedoresEditorComponent } from './produto-fornecedores-editor.component';
 
-describe('MultiSelectCreateComponent', () => {
-  let component: MultiSelectCreateComponent;
-  let fixture: ComponentFixture<MultiSelectCreateComponent>;
+describe('ProdutoFornecedoresEditorComponent', () => {
+  let component: ProdutoFornecedoresEditorComponent;
+  let fixture: ComponentFixture<ProdutoFornecedoresEditorComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MultiSelectCreateComponent],
+      imports: [ProdutoFornecedoresEditorComponent],
     }).compileComponents();
-
-    fixture = TestBed.createComponent(MultiSelectCreateComponent);
+    fixture = TestBed.createComponent(ProdutoFornecedoresEditorComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });
 
-  it('deve iniciar com lista vazia', () => {
-    expect(component.value).toEqual([]);
+  it('deve iniciar sem linhas', () => {
+    expect(component.linhas).toEqual([]);
   });
 
   it('deve tratar null do writeValue como lista vazia', () => {
-    component.writeValue(null as unknown as string[]);
-    expect(component.value).toEqual([]);
+    component.writeValue(null as never);
+    expect(component.linhas).toEqual([]);
   });
 
-  it('deve sugerir apenas opções ainda não selecionadas, ignorando caixa', () => {
-    component.options = ['Votorantim', 'Tigre', 'Amanco'];
-    component.writeValue(['votorantim']);
-
-    component.filtrar({ query: '' } as never);
-
-    expect(component.sugestoes).toEqual(['Tigre', 'Amanco']);
+  it('adicionar cria uma linha vazia', () => {
+    component.adicionar();
+    expect(component.linhas).toEqual([{ nome: '', precoCompra: null }]);
   });
 
-  it('deve filtrar sugestões pelo texto digitado', () => {
-    component.options = ['Votorantim', 'Tigre'];
-
-    component.filtrar({ query: 'ti' } as never);
-
-    expect(component.sugestoes).toEqual(['Tigre']);
+  it('remover exclui a linha pelo índice', () => {
+    component.writeValue([{ nome: 'Tigre', precoCompra: 8 }, { nome: 'Amanco', precoCompra: null }]);
+    component.remover(0);
+    expect(component.linhas).toEqual([{ nome: 'Amanco', precoCompra: null }]);
   });
 
-  it('deve remover duplicatas ao selecionar, comparando sem caixa', () => {
-    const emitidos: string[][] = [];
+  it('emite apenas linhas com fornecedor preenchido, com nome trimado', () => {
+    const emitidos: unknown[] = [];
     component.registerOnChange(v => emitidos.push(v));
-
-    component.aoMudar(['Tigre', 'tigre', '  Tigre  ']);
-
-    expect(emitidos.at(-1)).toEqual(['Tigre']);
-  });
-
-  it('deve descartar entradas vazias', () => {
-    const emitidos: string[][] = [];
-    component.registerOnChange(v => emitidos.push(v));
-
-    component.aoMudar(['Tigre', '   ', '']);
-
-    expect(emitidos.at(-1)).toEqual(['Tigre']);
+    component.linhas = [{ nome: '  Tigre  ', precoCompra: 8 }, { nome: '', precoCompra: 5 }];
+    component.emitir();
+    expect(emitidos.at(-1)).toEqual([{ nome: 'Tigre', precoCompra: 8 }]);
   });
 });
 ```
 
-- [ ] **Step 2: Rodar para verificar que falha**
+- [ ] **Step 2: Rodar (RED)**
 
-Run (em `marluse-frontend/`): `npm test -- --run multi-select-create`
+Run (em `marluse-frontend/`): `npx ng test --include "src/app/shared/components/produto-fornecedores-editor/**" --watch=false`
+Expected: falha — módulo não encontrado.
 
-Expected: FALHA — não consegue resolver `./multi-select-create.component`.
+- [ ] **Step 3: Implementar o componente**
 
-- [ ] **Step 3: Criar o componente**
+CVA sobre uma lista de linhas. Cada linha usa um `app-select-search` (ou `p-autocomplete` single) para o nome do fornecedor com sugestões de `@Input() options: string[]`, e um `p-inputnumber` para o preço. Botão "+ adicionar" chama `adicionar()`; lixeira por linha chama `remover(i)`. Qualquer mudança chama `emitir()`, que filtra linhas sem nome, trima o nome e propaga via `onChange`.
 
-`marluse-frontend/src/app/shared/components/multi-select-create/multi-select-create.component.ts`:
-
+Assinatura mínima que o teste exige:
 ```ts
-import { Component, Input, forwardRef } from '@angular/core';
-import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
-import { AutoCompleteModule, AutoCompleteCompleteEvent } from 'primeng/autocomplete';
-
-/**
- * Multi-select em chips que aceita valores novos digitados pelo usuário.
- * Trabalha com nomes (string[]), não com ids — quem resolve nome→entidade é o backend.
- */
-@Component({
-  selector: 'app-multi-select-create',
-  standalone: true,
-  imports: [CommonModule, FormsModule, AutoCompleteModule],
-  providers: [
-    {
-      provide: NG_VALUE_ACCESSOR,
-      useExisting: forwardRef(() => MultiSelectCreateComponent),
-      multi: true,
-    },
-  ],
-  template: `
-    <p-autocomplete
-      [(ngModel)]="value"
-      (ngModelChange)="aoMudar($event)"
-      (onBlur)="onTouched()"
-      (completeMethod)="filtrar($event)"
-      [suggestions]="sugestoes"
-      [multiple]="true"
-      [dropdown]="true"
-      [disabled]="disabled"
-      [placeholder]="placeholder"
-      emptyMessage="Digite para cadastrar um novo"
-      appendTo="body"
-      styleClass="w-full" />
-  `,
-})
-export class MultiSelectCreateComponent implements ControlValueAccessor {
-  /** Nomes já cadastrados, usados como sugestão. */
-  @Input() options: string[] = [];
-  @Input() placeholder = 'Digite e pressione Enter…';
-
-  value: string[] = [];
-  sugestoes: string[] = [];
-  disabled = false;
-
-  private onChange = (_: string[]) => {};
-  onTouched = () => {};
-
-  filtrar(event: AutoCompleteCompleteEvent): void {
-    const termo = (event.query ?? '').trim().toLowerCase();
-    const jaEscolhidos = new Set(this.value.map(v => v.toLowerCase()));
-
-    this.sugestoes = this.options
-      .filter(opcao => !jaEscolhidos.has(opcao.toLowerCase()))
-      .filter(opcao => opcao.toLowerCase().includes(termo));
-  }
-
-  aoMudar(valores: string[]): void {
-    this.value = this.normalizar(valores);
-    this.onChange(this.value);
-  }
-
-  /** Trim, descarta vazios e deduplica ignorando caixa — espelha o backend. */
-  private normalizar(valores: string[]): string[] {
-    const vistos = new Set<string>();
-    const saida: string[] = [];
-
-    for (const bruto of valores ?? []) {
-      const nome = (bruto ?? '').trim();
-      if (!nome) continue;
-      const chave = nome.toLowerCase();
-      if (vistos.has(chave)) continue;
-      vistos.add(chave);
-      saida.push(nome);
-    }
-    return saida;
-  }
-
-  writeValue(valores: string[]): void {
-    this.value = valores ?? [];
-  }
-
-  registerOnChange(fn: (_: string[]) => void): void {
-    this.onChange = fn;
-  }
-
-  registerOnTouched(fn: () => void): void {
-    this.onTouched = fn;
-  }
-
-  setDisabledState(disabled: boolean): void {
-    this.disabled = disabled;
-  }
-}
+linhas: ProdutoFornecedorDto[] = [];
+@Input() options: string[] = [];
+adicionar(): void
+remover(i: number): void
+emitir(): void
+writeValue(v: ProdutoFornecedorDto[] | null): void
+registerOnChange(fn): void ; registerOnTouched(fn): void ; setDisabledState(b): void
 ```
 
-- [ ] **Step 4: Rodar para verificar que passa**
+- [ ] **Step 4: Rodar (GREEN)**
 
-Run (em `marluse-frontend/`): `npm test -- --run multi-select-create`
+Run: `npx ng test --include "src/app/shared/components/produto-fornecedores-editor/**" --watch=false`
+Expected: PASS, 5 testes.
 
-Expected: PASS, 6 testes.
-
-Se `AutoCompleteCompleteEvent` não for exportado por `primeng/autocomplete` nesta versão, troque o tipo do parâmetro por `{ query: string }` e remova o import — o teste já passa um objeto literal.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Remover o multi-select-create**
 
 ```bash
-git add src/app/shared/components/multi-select-create
-git commit -m "feat: componente multi-select-create com criacao por digitacao"
+git rm -r src/app/shared/components/multi-select-create
+```
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/app/shared/components/produto-fornecedores-editor
+git commit -m "feat: editor de fornecedores+preco; remove multi-select-create"
 ```
 
 ---
 
-## Task 8: Campo de fornecedores no modal de produto
+## Task 6: Integrar o editor no modal de produto
 
 **Files:**
-- Modify: `marluse-frontend/src/app/features/estoque/novo-produto-modal/novo-produto-modal.component.ts`
-- Modify: `marluse-frontend/src/app/features/estoque/novo-produto-modal/novo-produto-modal.component.html`
+- Modify: `marluse-frontend/src/app/features/estoque/novo-produto-modal/novo-produto-modal.component.ts` (+ `.html`)
 
-- [ ] **Step 1: Ligar o control no componente**
+- [ ] **Step 1: Trocar o componente no `.ts`**
 
-Em `novo-produto-modal.component.ts`:
-
-Imports novos:
-
+Remover o import/uso de `MultiSelectCreateComponent`; importar `ProdutoFornecedoresEditorComponent` e adicioná-lo ao array `imports`. O control `fornecedores` continua sem validator, mas agora seu valor é `ProdutoFornecedorDto[]`:
 ```ts
-import { Component, Input, Output, EventEmitter, OnChanges, OnInit, inject } from '@angular/core';
-import { MultiSelectCreateComponent } from '../../../shared/components/multi-select-create/multi-select-create.component';
-import { FornecedoresService } from '../fornecedores.service';
+fornecedores: [[] as ProdutoFornecedorDto[]],
 ```
+No `ngOnChanges` (edição) preencher com `this.produto.fornecedores ?? []`; na criação, `[]`. No `onSalvar`, enviar `v.fornecedores ?? []`.
 
-Adicione `MultiSelectCreateComponent` ao array `imports` do decorator, e `OnInit` à cláusula `implements`.
+- [ ] **Step 2: Campo no `.html`**
 
-Nova dependência e estado, junto do `private fb = inject(FormBuilder);`:
-
-```ts
-  private fornecedoresService = inject(FornecedoresService);
-
-  /** Nomes já cadastrados, usados só como sugestão. */
-  fornecedoresDisponiveis: string[] = [];
-```
-
-Novo control no `form` (após `categoria`), sem validator — o campo é opcional:
-
-```ts
-    fornecedores:      [[] as string[]],
-```
-
-Carga das sugestões. A lista é pequena e muda pouco, então carregar uma vez na criação do componente basta:
-
-```ts
-  ngOnInit(): void {
-    this.fornecedoresService.listar().subscribe({
-      next: lista => this.fornecedoresDisponiveis = lista.map(f => f.nome),
-      // Sem sugestões o campo continua utilizável (digitação livre) — não bloqueia o cadastro.
-      error: () => this.fornecedoresDisponiveis = [],
-    });
-  }
-```
-
-No `ngOnChanges`, no ramo de edição, adicione ao objeto do `form.reset`:
-
-```ts
-        fornecedores:      this.produto.fornecedores ?? [],
-```
-
-E no ramo de criação, adicione `fornecedores: []` ao `form.reset({...})`.
-
-No `onSalvar`, adicione ao `payload`:
-
-```ts
-      fornecedores:      v.fornecedores ?? [],
-```
-
-- [ ] **Step 2: Adicionar o campo no template**
-
-Em `novo-produto-modal.component.html`, insira este bloco **depois** do grid "Unidade + Categoria" (que termina na linha ~123) e **antes** do grid "Quantidade + Estoque mínimo":
-
+Substituir o bloco `app-multi-select-create` por:
 ```html
-    <!-- Fornecedores -->
-    <div class="flex flex-col gap-1.5">
-      <div class="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.06em]">Fornecedores</div>
-      <app-multi-select-create formControlName="fornecedores"
-        [options]="fornecedoresDisponiveis"
-        placeholder="Digite o nome e pressione Enter…" />
-      <span class="text-[11px] text-gray-400">Opcional. Fornecedor que ainda não existe é criado ao salvar.</span>
-    </div>
+<app-produto-fornecedores-editor formControlName="fornecedores"
+  [options]="fornecedoresDisponiveis" />
 ```
 
-Sem bloco `@if (… | fieldError)`: o campo não tem validator.
+- [ ] **Step 3: Typecheck + rodar**
 
-- [ ] **Step 3: Verificar que compila**
+Run: `npx tsc -p tsconfig.app.json --noEmit` → sem erro.
+Run: `npx ng test --watch=false` → sem falha nova.
 
-Run (em `marluse-frontend/`): `npx tsc -p tsconfig.app.json --noEmit`
-
-Expected: nenhum erro.
-
-- [ ] **Step 4: Rodar a suíte de frontend**
-
-Run (em `marluse-frontend/`): `npm test -- --run`
-
-Expected: nenhuma falha **nova** em relação ao baseline anotado na Task 1.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add src/app/features/estoque/novo-produto-modal
-git commit -m "feat: campo de fornecedores no modal de produto"
+git commit -m "feat: usa o editor de fornecedores no modal de produto"
 ```
 
 ---
 
-## Task 9: Verificação ponta a ponta no navegador
+## Task 7: Modal de visualização do produto
 
-**Files:** nenhum (apenas verificação)
+**Files:**
+- Create: `marluse-frontend/src/app/features/estoque/produto-detalhe-modal/produto-detalhe-modal.component.ts` (+ `.html`)
+- Modify: `marluse-frontend/src/app/features/estoque/estoque/estoque.component.ts` (+ `.html`)
+
+- [ ] **Step 1: Criar o modal de detalhe**
+
+No padrão de `cliente-detalhe-modal`: standalone, `DialogModule`, `@Input() visible`, `@Input() produto: ProdutoResponse | null`, `@Output() fechar`, `@Output() editar`. Somente leitura. Renderiza os campos do produto e uma tabela/lista dos fornecedores com `nome` e `precoCompra` (formatado em BRL; "—" quando nulo). Botão "Editar" emite `editar`.
+
+- [ ] **Step 2: Ligar no estoque**
+
+Em `estoque.component.ts`: `showDetalhe = false; produtoDetalhe: ProdutoResponse | null = null;` e métodos `abrirDetalhe(p)`, `fecharDetalhe()`, e um `onEditarDoDetalhe(p)` que fecha o detalhe e chama `abrirModalEditar(p)`. Importar `ProdutoDetalheModalComponent`.
+
+Em `estoque.component.html`: adicionar o `<app-produto-detalhe-modal>` e, na linha do produto, um ícone de olho (`pi pi-eye`) ao lado do lápis, com `(click)` chamando `abrirDetalhe(produto)`. Emitir `(editar)` → `onEditarDoDetalhe`.
+
+- [ ] **Step 3: Typecheck + rodar**
+
+Run: `npx tsc -p tsconfig.app.json --noEmit` → sem erro.
+Run: `npx ng test --watch=false` → sem falha nova.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/app/features/estoque/produto-detalhe-modal src/app/features/estoque/estoque
+git commit -m "feat: modal de visualizacao de produto com fornecedores e precos"
+```
+
+---
+
+## Task 8: Verificação ponta a ponta
+
+**Files:** nenhum (verificação)
 
 - [ ] **Step 1: Subir backend e frontend**
 
-Run (em `marluse/`): `./mvnw spring-boot:run`
-Run (em `marluse-frontend/`): `npm start`
+`JAVA_HOME="..." ./mvnw spring-boot:run` (em `marluse/`) e `npm start` (em `marluse-frontend/`).
 
-- [ ] **Step 2: Criar produto com fornecedor novo**
+- [ ] **Step 2: Criar produto com fornecedores e preços**
 
-Estoque → **Novo produto**. Preencha os campos obrigatórios e, em Fornecedores, digite `Votorantim` + Enter e `Tigre` + Enter. Salve.
+Novo produto → "+ adicionar" → escolher/criar "Votorantim", preço 10,00 → "+ adicionar" → "Tigre", preço 8,50. Salvar. Sem erro.
 
-Expected: produto criado sem erro; dois chips apareceram enquanto se digitava.
+- [ ] **Step 3: Ver no modal de detalhe**
 
-- [ ] **Step 3: Confirmar a persistência e a sugestão**
+Clicar no ícone de olho do produto. Expected: modal de leitura mostra Votorantim R$10,00 e Tigre R$8,50.
 
-Abra **Novo produto** de novo e clique na setinha do dropdown de Fornecedores.
+- [ ] **Step 4: Editar preço e fornecedor**
 
-Expected: `Tigre` e `Votorantim` aparecem como sugestão, em ordem alfabética.
+Do detalhe, "Editar". Mudar o preço da Votorantim para 9,00, remover a Tigre, adicionar "Amanco" sem preço. Salvar. Reabrir o detalhe. Expected: Votorantim R$9,00 e Amanco "—".
 
-- [ ] **Step 4: Confirmar que o vínculo volta na edição**
+- [ ] **Step 5: Preço diferente em outro produto**
 
-Edite o produto criado no Step 2.
-
-Expected: os dois chips já vêm preenchidos.
-
-- [ ] **Step 5: Confirmar dedup case-insensitive**
-
-Crie um segundo produto e digite `votorantim` (minúsculo) + Enter. Salve. Depois, no console do DevTools:
-
+Criar "Reboco" com "votorantim" (minúsculo), preço 7,00. No detalhe do Reboco: Votorantim R$7,00. No detalhe do Cimento: Votorantim R$9,00.
 ```js
 await (await fetch('/api/fornecedores', { credentials: 'include' })).json()
 ```
+Expected: **1** Votorantim (não dois) — mesmo cadastro, preços distintos por produto.
 
-Expected: exatamente **2** fornecedores (`Tigre` e `Votorantim`) — não 3. O segundo produto reaproveitou o `Votorantim` existente.
+- [ ] **Step 6: Telas vizinhas intactas**
 
-- [ ] **Step 6: Confirmar que remover funciona**
-
-Edite o segundo produto, remova o chip pelo "x" e salve. Reabra a edição.
-
-Expected: sem fornecedores. O `GET /api/fornecedores` continua devolvendo 2 — remover o vínculo não apaga o cadastro do fornecedor.
-
-- [ ] **Step 7: Confirmar que nada quebrou nas telas vizinhas**
-
-Abra Vendas → Novo pedido e Locações → Nova locação, e confirme que a lista de produtos carrega normalmente. Esses fluxos consomem `ProdutoResponse` e são o lugar onde um `LazyInitializationException` apareceria.
-
-Expected: listas carregam sem erro no console.
-
-- [ ] **Step 8: Commit final (se houve algum ajuste)**
-
-```bash
-git add -A
-git commit -m "fix: ajustes da verificacao ponta a ponta de fornecedores"
-```
+Vendas → Novo pedido e Locações → Nova locação: a lista de produtos carrega sem erro no console (é onde um `LazyInitializationException` apareceria).
 
 ---
 
 ## Checklist de aceite
 
-- [ ] `./mvnw test` passa em `marluse/`
-- [ ] `npm test -- --run` em `marluse-frontend/` sem falhas novas em relação ao baseline
-- [ ] `GET /api/produtos` devolve `fornecedores` em cada item, sem erro 500
-- [ ] Fornecedor digitado em caixa diferente não vira registro duplicado
+- [ ] `JAVA_HOME=... ./mvnw test` passa em `marluse/`
+- [ ] `npx ng test --watch=false` sem falhas novas em `marluse-frontend/`
+- [ ] `GET /api/produtos` devolve `fornecedores` (nome + precoCompra) sem 500
+- [ ] Mesmo fornecedor com preços diferentes em produtos diferentes; um só cadastro
+- [ ] Preço opcional (vínculo sem preço aparece como "—")
 - [ ] Produto sem fornecedor continua sendo criado normalmente
-- [ ] `V11__fornecedores.sql` bate com o schema que o JPA gera em dev
+- [ ] Modal de view abre pelo ícone "ver" e mostra fornecedores + preços
+- [ ] `multi-select-create` removido do repositório

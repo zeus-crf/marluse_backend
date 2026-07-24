@@ -1,32 +1,39 @@
 # Fornecedores em Produtos — Design
 
 **Data:** 2026-07-24
-**Status:** Aprovado
+**Status:** Aprovado (revisado — inclui preço por fornecedor, lista editável e modal de view)
 
 ## Problema
 
-Produtos não registram de quem são comprados. É preciso saber quais fornecedores
-oferecem cada produto para consulta de compra.
+Produtos não registram de quem são comprados nem por quanto. É preciso saber
+quais fornecedores oferecem cada produto e a que preço cada um vende — para
+consulta de compra, sem interferir no custo/lucro do produto.
 
 ## Decisões
 
 | Questão | Decisão |
 |---|---|
-| Natureza | Múltiplos fornecedores por produto (N:N) |
+| Natureza | Vários fornecedores por produto |
 | Cadastro de fornecedor | Mínimo: apenas nome (único) |
-| Preço por fornecedor | Não. O vínculo não guarda preço; `valorCompra` do produto segue intocado |
-| Obrigatoriedade | Opcional. Sem backfill |
-| Onde aparece | Somente no modal de cadastro/edição de produto |
-| UX | Multi-select com criar-na-hora (chips) |
-| Gestão de fornecedores | Fora de escopo nesta entrega |
+| Preço por fornecedor | **Sim** — cada vínculo guarda o preço de compra daquele fornecedor |
+| `preco_compra` × `valorCompra` | Independentes. O preço do vínculo **não** altera o `valorCompra` do produto nem qualquer cálculo de lucro |
+| Preço obrigatório? | Opcional (pode vincular sem preço) |
+| Escopo do preço | Por par (produto, fornecedor). O mesmo fornecedor pode ter preços diferentes em produtos diferentes |
+| Obrigatoriedade do vínculo | Opcional. Sem backfill |
+| UX de cadastro | Botão "+ adicionar" cria uma linha editável (fornecedor + preço) |
+| UX de edição | Fornecedor **e** preço editáveis por linha; remover a linha |
+| Visualização | Novo modal de view do produto; linha do estoque ganha ícone "ver" separado do "editar" |
 
-O vínculo não guardar preço é deliberado: `Produto.valorCompra` alimenta o cálculo
-de custo/lucro em vendas, e duplicar essa informação por fornecedor criaria duas
-fontes de verdade para o mesmo número.
+O preço morar no vínculo (e não no fornecedor) é o que permite preços distintos
+por produto. Sua independência de `valorCompra` é deliberada: `valorCompra`
+alimenta custo/lucro em vendas, e o preço por fornecedor é só informação de compra.
 
 ## Modelo de dados
 
-Migration `V11__fornecedores.sql`, seguindo o padrão das migrations existentes.
+O vínculo deixa de ser junção pura e vira **entidade** `ProdutoFornecedor`.
+
+Migration `V11__fornecedores.sql` (editada — a V11 ainda não rodou em produção,
+Flyway só no perfil docker):
 
 ```sql
 CREATE TABLE fornecedores (
@@ -40,94 +47,109 @@ CREATE TABLE fornecedores (
 );
 
 CREATE TABLE produto_fornecedores (
-    produto_id    VARCHAR(36) NOT NULL,
-    fornecedor_id VARCHAR(36) NOT NULL,
-    PRIMARY KEY (produto_id, fornecedor_id),
+    id            VARCHAR(36)   NOT NULL,
+    produto_id    VARCHAR(36)   NOT NULL,
+    fornecedor_id VARCHAR(36)   NOT NULL,
+    preco_compra  DECIMAL(10,2) NULL,
+    created_at    DATETIME      NULL,
+    updated_at    DATETIME      NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_produto_fornecedor UNIQUE (produto_id, fornecedor_id),
     CONSTRAINT fk_pf_produto    FOREIGN KEY (produto_id)    REFERENCES produtos (id),
     CONSTRAINT fk_pf_fornecedor FOREIGN KEY (fornecedor_id) REFERENCES fornecedores (id)
 );
 ```
 
-Nenhuma coluna existente muda. Nenhum backfill: produtos atuais ficam sem fornecedor.
+Nenhuma coluna de `produtos` muda. Nenhum backfill.
 
 A collation padrão do MySQL é case-insensitive, então o `UNIQUE (nome)` já barra
-"Votorantim" vs "votorantim" — proteção necessária para o fluxo de criar-na-hora.
+"Votorantim" vs "votorantim". A garantia real de dedup, porém, vive no código
+(ver `resolverPorNomes`), porque em H2 (testes) o UNIQUE é case-sensitive.
 
 ## Backend
 
-Novo pacote `com.example.marluse.fornecedores`, espelhando a estrutura de `clientes`.
+Pacote `com.example.marluse.fornecedores` (Fornecedor + service + controller,
+já existentes) e a entidade de junção junto do produto.
 
-- `model/Fornecedor` (extends `BaseEntity`): `nome`, `ativo`
-- `repository/FornecedorRepository`: `findByNomeIgnoreCase`, `findByAtivoTrueOrderByNomeAsc`
-- `service/FornecedorService.resolverPorNomes(List<String>) → Set<Fornecedor>`:
-  trim, descarta vazios, deduplica ignorando caixa, busca o existente ou cria.
-  Único ponto de contato do `ProdutoService` com fornecedores.
-- `controller/FornecedorController`: apenas `GET /api/fornecedores`
-- `dto/FornecedorResponse(id, nome)`
-
-Em `Produto`: `@ManyToMany(fetch = LAZY)` + `@JoinTable("produto_fornecedores")`.
-
-`ProdutoResponse.from()` roda fora de transação hoje. Para a coleção LAZY não
-estourar `LazyInitializationException`, os finders do `ProdutoRepository` usados
-por `listar`, `listarRascunho`, `listarEstoqueBaixo` e `findById` recebem
-`@EntityGraph(attributePaths = "fornecedores")`. Isso resolve o lazy e evita N+1
-na listagem. EAGER foi descartado: geraria uma query por produto na listagem.
+- `Fornecedor` (inalterado): `nome`, `ativo`.
+- **`ProdutoFornecedor`** (entidade nova, extends `BaseEntity`):
+  `@ManyToOne produto`, `@ManyToOne fornecedor`, `BigDecimal precoCompra` (nullable).
+- `Produto`: `@OneToMany(mappedBy = "produto", cascade = ALL, orphanRemoval = true)
+  List<ProdutoFornecedor> fornecedores`. O `cascade`/`orphanRemoval` faz adicionar
+  e remover linha no modal refletir direto no banco.
+- `FornecedorService.resolverPorNomes` (inalterado): continua resolvendo
+  nome→`Fornecedor` (trim, dedup, buscar-ou-criar).
+- `ProdutoService`: para cada linha recebida, resolve o fornecedor pelo nome e
+  monta um `ProdutoFornecedor` com o preço.
 
 ### Contrato
 
-As DTOs trafegam **nomes**, não ids — o frontend nunca manipula id de fornecedor,
-o que torna o criar-na-hora trivial.
+- `ProdutoFornecedorRequest(String nome, BigDecimal precoCompra)`
+- `ProdutoFornecedorResponse(String nome, BigDecimal precoCompra)`
+- `ProdutoRequest.fornecedores: List<ProdutoFornecedorRequest>`
+- `ProdutoAtualizarRequest.fornecedores: List<ProdutoFornecedorRequest>`
+- `ProdutoResponse.fornecedores: List<ProdutoFornecedorResponse>` (ordenado por nome)
 
-- `ProdutoRequest.fornecedores: List<String>`
-- `ProdutoAtualizarRequest.fornecedores: List<String>`
-- `ProdutoResponse.fornecedores: List<String>` (ordenado por nome)
+No `atualizar`, patch parcial: `null` = não mexe; lista = substitui o conjunto
+inteiro de vínculos (remove os que sumiram, cria os novos, atualiza preços).
 
-No `atualizar`, seguindo o padrão de patch parcial existente:
-`null` = não mexe, `[]` = remove todos os vínculos.
+`@EntityGraph(attributePaths = "fornecedores")` nos finders que alimentam
+`ProdutoResponse.from()` — resolve o LAZY fora de transação e evita N+1.
 
 ## Frontend
 
-- `estoque.models.ts`: `fornecedores?: string[]` nas três interfaces.
-  Corrigir também o typo `categorira` → `categoria` em `ProdutoAtualizarRequest`
-  (o tipo hoje diverge do payload que o formulário realmente envia).
-- `features/estoque/fornecedores.service.ts`: apenas `listar()`
-- `shared/components/multi-select-create/`: novo componente CVA no molde do
-  `select-search`, baseado em `p-autocomplete` com `[multiple]` e `[dropdown]`.
-  Valor: `string[]`. Chips, filtro e criação por Enter.
-- `novo-produto-modal`: control `fornecedores: [[]]` sem validator; carrega
-  opções no próprio modal; preenche no `ngOnChanges`; envia no payload.
-  `estoque.component` não é tocado.
+### Modal de produto (criar + editar)
+
+Novo componente **`produto-fornecedores-editor`** (CVA, valor
+`ProdutoFornecedorRequest[]`). Seção "Fornecedores" com botão "+ adicionar" que
+insere uma linha vazia. Cada linha: seleção/criação de fornecedor + input de
+preço (opcional) + remover. Substitui o `multi-select-create`.
+
+Models: `fornecedores` nas 3 interfaces passa de `string[]` para
+`ProdutoFornecedorDto[]` (`{ nome: string; precoCompra: number | null }`).
+
+### Modal de visualização (novo)
+
+`produto-detalhe-modal`, no padrão de `cliente-detalhe-modal` /
+`pedido-detalhe-modal` (PrimeNG dialog, somente leitura). Exibe os dados do
+produto e a lista de fornecedores com seus preços. Botão "Editar" leva ao modal
+de edição. A linha do produto no estoque ganha um ícone de olho (ver) ao lado do
+lápis (editar).
+
+## Descartado do escopo anterior
+
+- **`multi-select-create`** (componente + spec): não comporta preço por chip.
+  Removido.
 
 ## Erros
 
-- Falha ao carregar a lista de fornecedores: o campo continua funcional (sem
-  sugestões, digitação livre). Não bloqueia o salvamento do produto.
+- Falha ao carregar a lista de fornecedores: o campo continua funcional
+  (digitação livre, sem sugestões). Não bloqueia o salvamento.
 - Nome limitado a 120 caracteres; nomes vazios ou só espaços são descartados.
+- Linha sem fornecedor selecionado é ignorada no envio.
 
 ### Limitação aceita: corrida na criação
 
-Duas requisições simultâneas criando o mesmo fornecedor novo podem passar as duas
-pelo lookup antes de qualquer insert. A segunda viola a `UNIQUE` e o salvamento
-daquele produto falha. O operador tenta de novo e funciona, porque na segunda
-tentativa o fornecedor já existe — e a `UNIQUE` garante que nunca haja duplicata,
-que é o ponto que realmente importa.
-
-Tratar a corrida no código exigiria criar o fornecedor numa transação separada
-(`REQUIRES_NEW`): capturar `DataIntegrityViolationException` e refazer o lookup no
-mesmo `EntityManager` não funciona, porque depois de um flush falhar o Hibernate
-marca a transação como rollback-only e a sessão fica inutilizável. Essa máquina
-não se justifica para o volume de uso esperado (poucos operadores simultâneos).
+Duas requisições simultâneas criando o mesmo fornecedor novo podem violar a
+`UNIQUE`; o salvamento daquele produto falha e o operador tenta de novo (na
+segunda vez o fornecedor já existe). A `UNIQUE` garante que nunca haja duplicata.
+Tratar a corrida exigiria `REQUIRES_NEW`, que não se justifica para o volume.
 
 ## Testes
 
-Em `ProdutoServiceTest`:
-- criar produto com nomes novos e existentes na mesma requisição
-- `" votorantim "` e `"Votorantim"` resolvem para um único fornecedor
-- update substitui o conjunto de vínculos
-- update com `[]` limpa os vínculos
-- update com `null` preserva os vínculos
+Backend (`ProdutoServiceTest`, `FornecedorServiceTest`):
+- criar produto com fornecedores e preços
+- preço nulo permitido no vínculo
+- mesmo fornecedor com preços diferentes em produtos diferentes
+- update substitui o conjunto; remove linha; `null` preserva
+- `resolverPorNomes` (inalterado): dedup case-insensitive, trim, trunca em 120
+
+Frontend:
+- `produto-fornecedores-editor`: adiciona linha vazia, edita, remove, emite lista
+- `produto-detalhe-modal`: renderiza fornecedores e preços
 
 ## Fora de escopo
 
-Tela de gestão de fornecedores, renomear/excluir, coluna na listagem de estoque,
-filtro por fornecedor, preço por fornecedor, dados de contato (telefone/CNPJ).
+Tela/CRUD global de fornecedores, renomear/excluir fornecedor globalmente,
+coluna de fornecedor na listagem de estoque, filtro por fornecedor, histórico de
+preços, dados de contato do fornecedor (telefone/CNPJ/e-mail).
