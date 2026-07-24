@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "produtos")
@@ -55,4 +57,13 @@ public class Produto extends BaseEntity {
     @Column(nullable = false)
     private boolean rascunho = false;
 
+
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "produto_fornecedores",
+            joinColumns = @JoinColumn(name = "produto_id"),
+            inverseJoinColumns = @JoinColumn(name = "fornecedor_id")
+    )
+    private Set<Fornecedor> fornecedores = new LinkedHashSet<>();
 }
