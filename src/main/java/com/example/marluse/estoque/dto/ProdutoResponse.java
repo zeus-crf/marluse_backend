@@ -4,6 +4,8 @@ import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.model.Produto;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.List;
 
 public record ProdutoResponse(
         String id,
@@ -18,7 +20,8 @@ public record ProdutoResponse(
         boolean estoqueBaixo,
         UnidadeMedida medida,
         CategoriaProduto categoria,
-        boolean rascunho
+        boolean rascunho,
+        List<ProdutoFornecedorResponse> fornecedores
 ) {
     public static ProdutoResponse from(Produto produto){
         return new ProdutoResponse(
@@ -34,7 +37,12 @@ public record ProdutoResponse(
                 produto.getQuantidadeEstoque().compareTo(BigDecimal.valueOf(produto.getEstoqueMinimo())) <= 0,
                 produto.getMedida(),
                 produto.getCategoria(),
-                produto.isRascunho()
+                produto.isRascunho(),
+                produto.getFornecedores().stream()
+                        .map(ProdutoFornecedorResponse::from)
+                        .sorted(Comparator.comparing(
+                                ProdutoFornecedorResponse::nome, String.CASE_INSENSITIVE_ORDER))
+                        .toList()
         );
     }
 }

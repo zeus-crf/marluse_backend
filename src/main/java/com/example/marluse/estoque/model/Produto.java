@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "produtos")
@@ -55,4 +57,19 @@ public class Produto extends BaseEntity {
     @Column(nullable = false)
     private boolean rascunho = false;
 
+
+    @Builder.Default
+    @OneToMany(mappedBy = "produto", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProdutoFornecedor> fornecedores = new ArrayList<>();
+
+    /** Remove todos os vínculos (orphanRemoval apaga do banco). */
+    public void limparFornecedores() {
+        this.fornecedores.clear();
+    }
+
+    /** Adiciona um vínculo mantendo os dois lados da relação em sincronia. */
+    public void addFornecedor(ProdutoFornecedor pf) {
+        pf.setProduto(this);
+        this.fornecedores.add(pf);
+    }
 }
