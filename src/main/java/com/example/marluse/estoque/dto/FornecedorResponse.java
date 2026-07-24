@@ -7,7 +7,7 @@ public record FornecedorResponse(
         String nome
 ) {
 
-    public FornecedorResponse from (Fornecedor fornecedor){
+    public static FornecedorResponse from(Fornecedor fornecedor){
         return new FornecedorResponse(fornecedor.getId(), fornecedor.getNome());
     }
 }
