@@ -17,6 +17,7 @@ import com.example.marluse.locacoes.dto.LocacaoEdicaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoResponse;
 import com.example.marluse.locacoes.enums.StatusLocacao;
+import com.example.marluse.locacoes.enums.UnidadeCobranca;
 import com.example.marluse.locacoes.model.ItemLocacao;
 import com.example.marluse.locacoes.model.Locacao;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
@@ -97,7 +98,9 @@ public class LocacaoService {
         for (ItemLocacaoRequest itemRequest : request.itens()){
             Produto produto;
             if (itemRequest.isProdutoNovo()){
-                produto = produtoService.criarRascunho(itemRequest.produtoNome(), itemRequest.precoDiaria(), itemRequest.precoDiaria());
+                produto = produtoService.criarRascunho(
+                        itemRequest.produtoNome(), null, itemRequest.precoDiaria(),
+                        com.example.marluse.estoque.enums.TipoProduto.LOCACAO);
             } else if (itemRequest.produtoId() != null && !itemRequest.produtoId().isBlank()) {
                 produto = produtoRepository.findById(itemRequest.produtoId())
                         .orElseThrow(() -> new EntityNotFoundException("Produto não encontrado"));
@@ -105,31 +108,45 @@ public class LocacaoService {
                 throw new IllegalArgumentException("Item inválido: informe um produto existente ou o nome de um produto novo");
             }
 
-            boolean baixar =  itemRequest.baixarEstoque();
+            boolean baixar = itemRequest.baixarEstoque();
             boolean permitir = Boolean.TRUE.equals(itemRequest.permitirSemEstoque());
 
-            BigDecimal diaria = itemRequest.precoDiaria() != null
+            UnidadeCobranca unidade = itemRequest.unidadeCobranca() != null
+                    ? itemRequest.unidadeCobranca()
+                    : UnidadeCobranca.DIARIA;
+
+            // Preço unitário do período: usa o valor enviado (editável) ou a tarifa do produto para a unidade
+            BigDecimal precoUnitario = itemRequest.precoDiaria() != null
                     ? itemRequest.precoDiaria()
-                    : (produto.getPrecoDiaria() !=  null ?
-                    produto.getPrecoDiaria() : produto.getPreco());
+                    : tarifaDoProduto(produto, unidade);
 
+            // Período cheio + resto na diária: períodos inteiros cobram a tarifa da
+            // unidade; os dias que sobram cobram a diária do produto. Ex.: 31 dias no
+            // mensal = 1 mês + 1 dia, não 2 meses.
+            int diasPorPeriodo = switch (unidade) {
+                case DIARIA  -> 1;
+                case SEMANAL -> 7;
+                case MENSAL  -> 30;
+            };
+            long periodosCheios = dias / diasPorPeriodo;
+            long diasAvulsos = dias % diasPorPeriodo;
+            BigDecimal diariaBase = tarifaDoProduto(produto, UnidadeCobranca.DIARIA);
 
-            BigDecimal subtotal = diaria
-                    .multiply(itemRequest.quantidade())
-                    .multiply(BigDecimal.valueOf(dias));
+            BigDecimal subtotal = precoUnitario.multiply(BigDecimal.valueOf(periodosCheios))
+                    .add(diariaBase.multiply(BigDecimal.valueOf(diasAvulsos)))
+                    .multiply(itemRequest.quantidade());
 
             ItemLocacao item = ItemLocacao.builder()
                     .locacao(locacao)
                     .produto(produto)
                     .quantidade(itemRequest.quantidade())
-                    .precoDiaria(produto.getPreco())
-                    .precoDiaria(diaria)
+                    .precoDiaria(precoUnitario)
+                    .unidadeCobranca(unidade)
                     .subtotal(subtotal)
                     .baixar_estoque(baixar)
                     .permitirSemEstoque(permitir)
                     .build();
 
-            // Orçamento nunca baixa; com entrega, baixa só na confirmação da entrega
             if (statusInicial != StatusLocacao.ORCAMENTO && !temEntrega && baixar) {
                 baixarEstoque(item);
             }
@@ -468,5 +485,20 @@ public class LocacaoService {
 
     private LocacaoResponse toResponse(Locacao locacao) {
         return LocacaoResponse.from(locacao);
+    }
+
+    private BigDecimal tarifaDoProduto(Produto produto, UnidadeCobranca unidade) {
+        // Diária é a tarifa-base. Semanal/mensal não cadastrados são derivados dela
+        // (×7 / ×30) — assim produtos com só a diária cobram certo em qualquer unidade,
+        // e uma semanal/mensal explícita funciona como desconto para locação mais longa.
+        BigDecimal diaria = produto.getPrecoDiaria() != null ? produto.getPrecoDiaria()
+                : (produto.getPreco() != null ? produto.getPreco() : BigDecimal.ZERO);
+        return switch (unidade) {
+            case DIARIA  -> diaria;
+            case SEMANAL -> produto.getPrecoSemanal() != null
+                    ? produto.getPrecoSemanal() : diaria.multiply(BigDecimal.valueOf(7));
+            case MENSAL  -> produto.getPrecoMensal() != null
+                    ? produto.getPrecoMensal() : diaria.multiply(BigDecimal.valueOf(30));
+        };
     }
 }

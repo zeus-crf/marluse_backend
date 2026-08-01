@@ -1,5 +1,6 @@
 package com.example.marluse.locacoes.dto;
 
+import com.example.marluse.locacoes.enums.UnidadeCobranca;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 
@@ -16,6 +17,8 @@ public record ItemLocacaoRequest (
         BigDecimal quantidade,
 
         BigDecimal precoDiaria,
+
+        UnidadeCobranca unidadeCobranca,
 
         boolean baixarEstoque,
 

@@ -6,6 +6,7 @@ import com.example.marluse.estoque.dto.ProdutoFornecedorRequest;
 import com.example.marluse.estoque.dto.ProdutoFornecedorResponse;
 import com.example.marluse.estoque.dto.ProdutoRequest;
 import com.example.marluse.estoque.dto.ProdutoResponse;
+import com.example.marluse.estoque.enums.TipoProduto;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.repository.ProdutoRepository;
 import com.example.marluse.estoque.service.ProdutoService;
@@ -57,7 +58,10 @@ public class ProdutoServiceTest {
                 BigDecimal.valueOf(quantidade), 5,
                 UnidadeMedida.SACO,
                 CategoriaProduto.OUTROS,
-                fornecedores);
+                fornecedores,
+                TipoProduto.VENDA,         // tipo
+                null,                      // precoSemanal
+                null);                     // precoMensal
     }
 
     /** Atalho para uma linha fornecedor+preço. */
@@ -124,7 +128,10 @@ public class ProdutoServiceTest {
                 BigDecimal.valueOf(50), 10,
                 UnidadeMedida.SACO,
                 CategoriaProduto.OUTROS,
-                null);   // null = não mexe nos fornecedores
+                null,                      // fornecedores (null = não mexe)
+                TipoProduto.VENDA,         // tipo
+                null,                      // precoSemanal
+                null);                     // precoMensal
         ProdutoResponse response = produtoService.atualizar(criado.id(), atualizado);
 
         assertEquals("Cimento CP-II", response.nome());
@@ -222,6 +229,33 @@ public class ProdutoServiceTest {
         assertEquals(0, new BigDecimal("10.00").compareTo(precoDe(atualizado, "Votorantim")));
     }
 
+    private ProdutoRequest produtoLocacao(String nome) {
+        return new ProdutoRequest(
+                nome, "Equipamento",
+                new BigDecimal("100.00"),  // valorCompra (custo do ativo)
+                null,                      // preco (venda) — não se aplica
+                new BigDecimal("20.00"),   // precoDiaria
+                BigDecimal.valueOf(5), 1,
+                UnidadeMedida.PECA,
+                CategoriaProduto.LOCACAO,
+                List.of(),
+                TipoProduto.LOCACAO,
+                new BigDecimal("100.00"),  // precoSemanal
+                new BigDecimal("300.00")); // precoMensal
+    }
+
+    @Test
+    void deveCriarProdutoDeLocacaoComTresTarifas() {
+        ProdutoResponse r = produtoService.criar(produtoLocacao("Betoneira"));
+
+        assertEquals(TipoProduto.LOCACAO, r.tipo());
+        assertEquals(0, new BigDecimal("20.00").compareTo(r.precoDiaria()));
+        assertEquals(0, new BigDecimal("100.00").compareTo(r.precoSemanal()));
+        assertEquals(0, new BigDecimal("300.00").compareTo(r.precoMensal()));
+        // preco de venda é coagido a ZERO para satisfazer NOT NULL sem se aplicar
+        assertEquals(0, BigDecimal.ZERO.compareTo(r.preco()));
+    }
+
     private ProdutoAtualizarRequest atualizarComFornecedores(List<ProdutoFornecedorRequest> fornecedores) {
         return new ProdutoAtualizarRequest(
                 "Cimento", "Descrição",
@@ -231,6 +265,9 @@ public class ProdutoServiceTest {
                 BigDecimal.valueOf(50), 5,
                 UnidadeMedida.SACO,
                 CategoriaProduto.OUTROS,
-                fornecedores);
+                fornecedores,
+                TipoProduto.VENDA,
+                null,
+                null);
     }
 }

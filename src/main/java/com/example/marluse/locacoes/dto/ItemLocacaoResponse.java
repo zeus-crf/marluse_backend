@@ -1,5 +1,6 @@
 package com.example.marluse.locacoes.dto;
 
+import com.example.marluse.locacoes.enums.UnidadeCobranca;
 import com.example.marluse.locacoes.model.ItemLocacao;
 
 import java.math.BigDecimal;
@@ -10,6 +11,7 @@ public record ItemLocacaoResponse(
         String produtoNome,
         BigDecimal quantidade,
         BigDecimal precoDiaria,
+        UnidadeCobranca unidadeCobranca,
         BigDecimal subtotal,
         boolean baixarEstoque,
         boolean permitirSemEstoque
@@ -21,6 +23,7 @@ public record ItemLocacaoResponse(
                 item.getProduto().getNome(),
                 item.getQuantidade(),
                 item.getPrecoDiaria(),
+                item.getUnidadeCobranca(),
                 item.getSubtotal(),
                 item.isBaixar_estoque(),
                 item.isPermitirSemEstoque()

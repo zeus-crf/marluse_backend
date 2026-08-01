@@ -1,5 +1,6 @@
 package com.example.marluse.estoque.dto;
 
+import com.example.marluse.estoque.enums.TipoProduto;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -20,6 +21,9 @@ public record ProdutoAtualizarRequest(
         Integer estoqueMinimo,
         UnidadeMedida medida,
         CategoriaProduto categoria,
-        List<ProdutoFornecedorRequest> fornecedores
+        List<ProdutoFornecedorRequest> fornecedores,
+        TipoProduto tipo,
+        BigDecimal precoSemanal,
+        BigDecimal precoMensal
 ) {
 }

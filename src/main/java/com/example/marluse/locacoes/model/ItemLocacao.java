@@ -1,9 +1,11 @@
 package com.example.marluse.locacoes.model;
 
 import com.example.marluse.estoque.model.Produto;
+import com.example.marluse.locacoes.enums.UnidadeCobranca;
 import com.example.marluse.shared.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 
@@ -32,6 +34,12 @@ public class ItemLocacao extends BaseEntity {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'DIARIA'")
+    @Column(name = "unidade_cobranca", length = 10, nullable = false)
+    private UnidadeCobranca unidadeCobranca = UnidadeCobranca.DIARIA;
 
     @Builder.Default
     @Column(name = "baixar_estoque", nullable = false)
