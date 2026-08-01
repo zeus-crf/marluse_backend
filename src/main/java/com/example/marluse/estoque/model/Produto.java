@@ -6,6 +6,7 @@ import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.shared.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public class Produto extends BaseEntity {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
+    @ColumnDefault("'VENDA'")
     @Column(name = "tipo", length = 20, nullable = false)
     private TipoProduto tipo = TipoProduto.VENDA;
 
