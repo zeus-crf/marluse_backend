@@ -2,6 +2,7 @@ package com.example.marluse.locacoes;
 
 import com.example.marluse.clientes.model.Cliente;
 import com.example.marluse.clientes.repository.ClienteRepository;
+import com.example.marluse.estoque.enums.TipoProduto;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.model.Produto;
 import com.example.marluse.estoque.repository.ProdutoRepository;
@@ -13,6 +14,7 @@ import com.example.marluse.locacoes.dto.ItemLocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoRequest;
 import com.example.marluse.locacoes.dto.LocacaoResponse;
 import com.example.marluse.locacoes.enums.StatusLocacao;
+import com.example.marluse.locacoes.enums.UnidadeCobranca;
 import com.example.marluse.locacoes.repository.LocacaoRepository;
 import com.example.marluse.locacoes.service.LocacaoService;
 import com.example.marluse.vendas.enums.FormaPagamento;
@@ -81,7 +83,7 @@ public class LocacoesServiceTest {
 
     /** Item com produto existente, baixando estoque. */
     private ItemLocacaoRequest item(String produtoId, int quantidade) {
-        return new ItemLocacaoRequest(produtoId, null, BigDecimal.valueOf(quantidade), null, true, false);
+        return new ItemLocacaoRequest(produtoId, null, BigDecimal.valueOf(quantidade), null, UnidadeCobranca.DIARIA, true, false);
     }
 
     /** LocacaoRequest mínimo: campos essenciais, o resto null. */
@@ -190,5 +192,51 @@ public class LocacoesServiceTest {
 
         assertNull(response.clienteId());
         assertEquals("Consumidor Final", response.clienteNome());
+    }
+
+    /** Cria uma locação de 10 dias com um produto de locação (diária 20, semanal 100, mensal 300),
+     *  um item qtd 1 usando a unidade e o preço unitário informados, sem baixar estoque, à vista. */
+    private LocacaoResponse criarLocacao10DiasComUnidade(UnidadeCobranca unidade, BigDecimal precoUnitario) {
+        Produto locacao = produtoRepository.save(Produto.builder()
+                .nome("Betoneira")
+                .tipo(TipoProduto.LOCACAO)
+                .preco(BigDecimal.ZERO)
+                .precoDiaria(new BigDecimal("20.00"))
+                .precoSemanal(new BigDecimal("100.00"))
+                .precoMensal(new BigDecimal("300.00"))
+                .valorCompra(new BigDecimal("100.00"))
+                .quantidadeEstoque(BigDecimal.valueOf(5))
+                .estoqueMinimo(1)
+                .medida(UnidadeMedida.PECA)
+                .ativo(true)
+                .build());
+
+        ItemLocacaoRequest item = new ItemLocacaoRequest(
+                locacao.getId(), null, BigDecimal.ONE, precoUnitario, unidade, false, false);
+
+        LocacaoRequest request = locacaoRequest(
+                null, FormaPagamento.DINHEIRO,
+                LocalDate.now(), LocalDate.now().plusDays(10),
+                List.of(item), null);
+
+        return locacaoService.criar(request, false);
+    }
+
+    @Test
+    void deveCobrarPorSemanaArredondandoParaCima() {
+        // produto locação: diária 20, semanal 100, mensal 300; qtd 1
+        // retirada hoje, devolução +10 dias => 10 dias => ceil(10/7) = 2 semanas
+        // subtotal esperado = 100 (semanal) * 1 * 2 = 200
+        LocacaoResponse r = criarLocacao10DiasComUnidade(UnidadeCobranca.SEMANAL, new BigDecimal("100.00"));
+        assertEquals(0, new BigDecimal("200.00").compareTo(r.itens().get(0).subtotal()));
+        assertEquals(UnidadeCobranca.SEMANAL, r.itens().get(0).unidadeCobranca());
+    }
+
+    @Test
+    void deveCobrarPorMesArredondandoParaCima() {
+        // 10 dias => ceil(10/30) = 1 mês => subtotal = 300 * 1 * 1 = 300
+        LocacaoResponse r = criarLocacao10DiasComUnidade(UnidadeCobranca.MENSAL, new BigDecimal("300.00"));
+        assertEquals(0, new BigDecimal("300.00").compareTo(r.itens().get(0).subtotal()));
+        assertEquals(UnidadeCobranca.MENSAL, r.itens().get(0).unidadeCobranca());
     }
 }
