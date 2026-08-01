@@ -239,4 +239,33 @@ public class LocacoesServiceTest {
         assertEquals(0, new BigDecimal("300.00").compareTo(r.itens().get(0).subtotal()));
         assertEquals(UnidadeCobranca.MENSAL, r.itens().get(0).unidadeCobranca());
     }
+
+    @Test
+    void deveDerivarSemanalDaDiariaQuandoNaoCadastrada() {
+        // Produto de locação só com diária (20), SEM semanal/mensal — cenário de produto existente.
+        Produto soDiaria = produtoRepository.save(Produto.builder()
+                .nome("Compactador")
+                .tipo(TipoProduto.LOCACAO)
+                .preco(BigDecimal.ZERO)
+                .precoDiaria(new BigDecimal("20.00"))
+                .valorCompra(new BigDecimal("100.00"))
+                .quantidadeEstoque(BigDecimal.valueOf(5))
+                .estoqueMinimo(1)
+                .medida(UnidadeMedida.PECA)
+                .ativo(true)
+                .build());
+
+        // Item sem preço explícito (precoDiaria null) => o backend deriva a tarifa pela unidade.
+        ItemLocacaoRequest item = new ItemLocacaoRequest(
+                soDiaria.getId(), null, BigDecimal.ONE, null, UnidadeCobranca.SEMANAL, false, false);
+        LocacaoRequest request = locacaoRequest(
+                null, FormaPagamento.DINHEIRO,
+                LocalDate.now(), LocalDate.now().plusDays(10),
+                List.of(item), null);
+
+        LocacaoResponse r = locacaoService.criar(request, false);
+
+        // Semanal derivada = 20 × 7 = 140; períodos = ceil(10/7) = 2 => subtotal = 280
+        assertEquals(0, new BigDecimal("280.00").compareTo(r.itens().get(0).subtotal()));
+    }
 }

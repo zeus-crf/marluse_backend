@@ -482,14 +482,17 @@ public class LocacaoService {
     }
 
     private BigDecimal tarifaDoProduto(Produto produto, UnidadeCobranca unidade) {
-        BigDecimal tarifa = switch (unidade) {
-            case DIARIA  -> produto.getPrecoDiaria();
-            case SEMANAL -> produto.getPrecoSemanal();
-            case MENSAL  -> produto.getPrecoMensal();
+        // Diária é a tarifa-base. Semanal/mensal não cadastrados são derivados dela
+        // (×7 / ×30) — assim produtos com só a diária cobram certo em qualquer unidade,
+        // e uma semanal/mensal explícita funciona como desconto para locação mais longa.
+        BigDecimal diaria = produto.getPrecoDiaria() != null ? produto.getPrecoDiaria()
+                : (produto.getPreco() != null ? produto.getPreco() : BigDecimal.ZERO);
+        return switch (unidade) {
+            case DIARIA  -> diaria;
+            case SEMANAL -> produto.getPrecoSemanal() != null
+                    ? produto.getPrecoSemanal() : diaria.multiply(BigDecimal.valueOf(7));
+            case MENSAL  -> produto.getPrecoMensal() != null
+                    ? produto.getPrecoMensal() : diaria.multiply(BigDecimal.valueOf(30));
         };
-        // Fallback defensivo: se a tarifa da unidade não estiver cadastrada, usa a diária, depois o preço
-        if (tarifa == null) tarifa = produto.getPrecoDiaria();
-        if (tarifa == null) tarifa = produto.getPreco();
-        return tarifa != null ? tarifa : BigDecimal.ZERO;
     }
 }
