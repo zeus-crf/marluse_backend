@@ -120,15 +120,21 @@ public class LocacaoService {
                     ? itemRequest.precoDiaria()
                     : tarifaDoProduto(produto, unidade);
 
-            long periodos = switch (unidade) {
-                case DIARIA  -> dias;
-                case SEMANAL -> (long) Math.ceil(dias / 7.0);
-                case MENSAL  -> (long) Math.ceil(dias / 30.0);
+            // Período cheio + resto na diária: períodos inteiros cobram a tarifa da
+            // unidade; os dias que sobram cobram a diária do produto. Ex.: 31 dias no
+            // mensal = 1 mês + 1 dia, não 2 meses.
+            int diasPorPeriodo = switch (unidade) {
+                case DIARIA  -> 1;
+                case SEMANAL -> 7;
+                case MENSAL  -> 30;
             };
+            long periodosCheios = dias / diasPorPeriodo;
+            long diasAvulsos = dias % diasPorPeriodo;
+            BigDecimal diariaBase = tarifaDoProduto(produto, UnidadeCobranca.DIARIA);
 
-            BigDecimal subtotal = precoUnitario
-                    .multiply(itemRequest.quantidade())
-                    .multiply(BigDecimal.valueOf(periodos));
+            BigDecimal subtotal = precoUnitario.multiply(BigDecimal.valueOf(periodosCheios))
+                    .add(diariaBase.multiply(BigDecimal.valueOf(diasAvulsos)))
+                    .multiply(itemRequest.quantidade());
 
             ItemLocacao item = ItemLocacao.builder()
                     .locacao(locacao)
