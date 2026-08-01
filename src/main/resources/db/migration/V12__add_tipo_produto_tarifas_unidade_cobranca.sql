@@ -33,19 +33,11 @@ SET @ddl := IF(@exists = 0,
 PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- Backfill do tipo (idempotente: só afeta linhas com tipo NULL).
--- Marca LOCACAO por dois sinais confiáveis, sem falso positivo:
---   1) categoria = 'LOCACAO' (marcação explícita), OU
---   2) produto já usado em alguma locação (itens_locacao) — se já foi alugado, é
---      locação de verdade, e isso evita que equipamentos reais sumam do dropdown.
--- (Heurística por preco_diaria foi descartada: marcava produtos de venda por engano.)
-UPDATE produtos p
-LEFT JOIN itens_locacao il ON il.produto_id = p.id
-SET p.tipo = 'LOCACAO'
-WHERE p.tipo IS NULL
-  AND (
-        p.categoria = 'LOCACAO'
-     OR il.produto_id IS NOT NULL
-  );
+-- Marca LOCACAO apenas por categoria = 'LOCACAO' — único sinal confiável no dado
+-- legado. (Heurísticas por diária ou por uso em itens_locacao foram descartadas:
+-- o fluxo antigo permitia alugar qualquer produto, então marcavam vendas por engano.)
+-- Produtos de locação sem essa categoria devem ser re-marcados no modal após o deploy.
+UPDATE produtos SET tipo = 'LOCACAO' WHERE tipo IS NULL AND categoria = 'LOCACAO';
 
 -- O restante é venda.
 UPDATE produtos SET tipo = 'VENDA' WHERE tipo IS NULL;
