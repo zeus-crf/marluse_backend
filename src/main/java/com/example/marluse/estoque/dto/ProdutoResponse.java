@@ -1,5 +1,6 @@
 package com.example.marluse.estoque.dto;
 
+import com.example.marluse.estoque.enums.TipoProduto;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.model.Produto;
 
@@ -21,7 +22,10 @@ public record ProdutoResponse(
         UnidadeMedida medida,
         CategoriaProduto categoria,
         boolean rascunho,
-        List<ProdutoFornecedorResponse> fornecedores
+        List<ProdutoFornecedorResponse> fornecedores,
+        TipoProduto tipo,
+        BigDecimal precoSemanal,
+        BigDecimal precoMensal
 ) {
     public static ProdutoResponse from(Produto produto){
         return new ProdutoResponse(
@@ -42,7 +46,10 @@ public record ProdutoResponse(
                         .map(ProdutoFornecedorResponse::from)
                         .sorted(Comparator.comparing(
                                 ProdutoFornecedorResponse::nome, String.CASE_INSENSITIVE_ORDER))
-                        .toList()
+                        .toList(),
+                produto.getTipo(),
+                produto.getPrecoSemanal(),
+                produto.getPrecoMensal()
         );
     }
 }

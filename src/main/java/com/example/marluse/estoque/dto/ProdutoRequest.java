@@ -1,5 +1,6 @@
 package com.example.marluse.estoque.dto;
 
+import com.example.marluse.estoque.enums.TipoProduto;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -38,6 +39,14 @@ public record ProdutoRequest(
         @NotNull(message = "Categoria é obrigatória")
         CategoriaProduto categoria,
 
-        List<ProdutoFornecedorRequest> fornecedores
+        List<ProdutoFornecedorRequest> fornecedores,
+
+        TipoProduto tipo,
+
+        @DecimalMin(value = "0.0", inclusive = false, message = "Preço semanal deve ser maior que zero")
+        BigDecimal precoSemanal,
+
+        @DecimalMin(value = "0.0", inclusive = false, message = "Preço mensal deve ser maior que zero")
+        BigDecimal precoMensal
 ) {
 }

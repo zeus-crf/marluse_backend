@@ -5,6 +5,7 @@ import com.example.marluse.estoque.dto.ProdutoAtualizarRequest;
 import com.example.marluse.estoque.dto.ProdutoFornecedorRequest;
 import com.example.marluse.estoque.dto.ProdutoRequest;
 import com.example.marluse.estoque.dto.ProdutoResponse;
+import com.example.marluse.estoque.enums.TipoProduto;
 import com.example.marluse.estoque.enums.UnidadeMedida;
 import com.example.marluse.estoque.model.Fornecedor;
 import com.example.marluse.estoque.model.Produto;
@@ -32,15 +33,30 @@ public class ProdutoService {
             throw new IllegalArgumentException("Esse produto já exite");
         }
 
+        TipoProduto tipo = request.tipo() != null ? request.tipo() : TipoProduto.VENDA;
+
+        // Locação não tem preço de venda; coage a ZERO para satisfazer o NOT NULL de `preco`
+        BigDecimal precoVenda = tipo == TipoProduto.LOCACAO
+                ? (request.preco() != null ? request.preco() : BigDecimal.ZERO)
+                : request.preco();
+
+        // preco_diaria é NOT NULL no schema; mantém o fallback existente
+        BigDecimal diaria = request.precoDiaria() != null
+                ? request.precoDiaria()
+                : (precoVenda != null ? precoVenda : BigDecimal.ZERO);
+
         Produto produto = Produto.builder()
                 .nome(request.nome())
                 .descricao(request.descricao())
-                .preco(request.preco())
-                .precoDiaria(request.precoDiaria() != null ? request.precoDiaria() : request.preco())
+                .preco(precoVenda)
+                .precoDiaria(diaria)
+                .precoSemanal(request.precoSemanal())
+                .precoMensal(request.precoMensal())
                 .valorCompra(request.valorCompra())
                 .quantidadeEstoque(request.quantidadeEstoque() != null ? request.quantidadeEstoque() : BigDecimal.ZERO)
                 .estoqueMinimo(request.estoqueMinimo() != null ? request.estoqueMinimo() : 0)
                 .ativo(true)
+                .tipo(tipo)
                 .medida(request.medida())
                 .categoria(request.categoria() != null ? request.categoria() : CategoriaProduto.OUTROS)
                 .build();
@@ -72,10 +88,14 @@ public class ProdutoService {
     }
 
     @Transactional
-    public Produto criarRascunho( String nome, BigDecimal preco, BigDecimal precoDiaria){
+    public Produto criarRascunho(String nome, BigDecimal preco, BigDecimal precoDiaria){
+        return criarRascunho(nome, preco, precoDiaria, TipoProduto.VENDA);
+    }
 
-        BigDecimal precoVenda = preco != null ? preco :
-                BigDecimal.ZERO;
+    @Transactional
+    public Produto criarRascunho(String nome, BigDecimal preco, BigDecimal precoDiaria, TipoProduto tipo){
+
+        BigDecimal precoVenda = preco != null ? preco : BigDecimal.ZERO;
 
         Produto produto = Produto.builder()
                 .nome(nome)
@@ -86,13 +106,12 @@ public class ProdutoService {
                 .estoqueMinimo(0)
                 .ativo(true)
                 .rascunho(true)
+                .tipo(tipo)
                 .medida(UnidadeMedida.PECA)
-                .categoria(CategoriaProduto.OUTROS)
+                .categoria(tipo == TipoProduto.LOCACAO ? CategoriaProduto.LOCACAO : CategoriaProduto.OUTROS)
                 .build();
 
         return produtoRepository.save(produto);
-
-
     }
 
     public List<ProdutoResponse> listar(){
@@ -124,6 +143,9 @@ public class ProdutoService {
         if (request.valorCompra() != null) produto.setValorCompra(request.valorCompra());
         if (request.preco() != null) produto.setPreco(request.preco());
         if (request.precoDiaria() != null) produto.setPrecoDiaria(request.precoDiaria());
+        if (request.tipo() != null) produto.setTipo(request.tipo());
+        if (request.precoSemanal() != null) produto.setPrecoSemanal(request.precoSemanal());
+        if (request.precoMensal() != null) produto.setPrecoMensal(request.precoMensal());
         if (request.medida() != null) produto.setMedida(request.medida());
         if (request.quantidadeEstoque() != null) produto.setQuantidadeEstoque(request.quantidadeEstoque());
         if (request.categoria() != null ) produto.setCategoria(request.categoria());
