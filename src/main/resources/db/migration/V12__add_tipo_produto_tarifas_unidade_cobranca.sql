@@ -33,11 +33,11 @@ SET @ddl := IF(@exists = 0,
 PREPARE s FROM @ddl; EXECUTE s; DEALLOCATE PREPARE s;
 
 -- Backfill do tipo (idempotente: só afeta linhas com tipo NULL).
--- Marca LOCACAO por sinais reais de locação, não apenas pela categoria — no modelo
--- antigo qualquer produto podia ser alugado, então classificar só por categoria
--- faria equipamentos de locação (categorizados de outra forma) sumirem do dropdown.
--- Sinais: categoria LOCACAO, OU já usado em alguma locação (itens_locacao),
--- OU com diária explicitamente diferente do preço de venda.
+-- Marca LOCACAO por dois sinais confiáveis, sem falso positivo:
+--   1) categoria = 'LOCACAO' (marcação explícita), OU
+--   2) produto já usado em alguma locação (itens_locacao) — se já foi alugado, é
+--      locação de verdade, e isso evita que equipamentos reais sumam do dropdown.
+-- (Heurística por preco_diaria foi descartada: marcava produtos de venda por engano.)
 UPDATE produtos p
 LEFT JOIN itens_locacao il ON il.produto_id = p.id
 SET p.tipo = 'LOCACAO'
@@ -45,7 +45,6 @@ WHERE p.tipo IS NULL
   AND (
         p.categoria = 'LOCACAO'
      OR il.produto_id IS NOT NULL
-     OR (p.preco_diaria IS NOT NULL AND p.preco_diaria <> p.preco)
   );
 
 -- O restante é venda.
